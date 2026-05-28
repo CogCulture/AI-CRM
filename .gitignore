@@ -1,0 +1,14 @@
+# Backend ignored files
+backend/venv/
+backend/.env
+backend/token.json
+backend/__pycache__/
+backend/config_store.json
+*.pyc
+
+# Root client secrets
+client_secret_*.json
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: rgba(255, 255, 255, 0.04);
+  --color-border-lux: rgba(255, 255, 255, 0.08);
+  --color-accent: #6366f1;
+  --color-accent-light: #a5b4fc;
+  --color-base: #0a0a0f;
+  --color-text-primary: #f1f1f5;
+  --color-text-secondary: #888899;
+  
+  --font-display: "Instrument Serif", serif;
+  --font-mono: "DM Mono", monospace;
+}
+
+:root {
+  --background: #0A0A0F;
+  --foreground: #F1F1F5;
+}
+
+body {
+  background-color: #08080C;
+  color: #F1F1F5;
+  font-family: var(--font-geist-sans), sans-serif;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.02) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(165, 180, 252, 0.02) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Obsidian Premium Card Utility */
+.obsidian-glass {
+  background: #0E0E14;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.4);
+}
+
+.obsidian-glass-hover {
+  transition: all 0.25s ease;
+}
+.obsidian-glass-hover:hover {
+  background: #111119;
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 4px 24px 0 rgba(99, 102, 241, 0.03);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+/* Recharts Custom Styling */
+.recharts-default-tooltip {
+  background-color: rgba(10, 10, 15, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Table Animation Reveal */
+@keyframes fadeInStagger {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.row-fade-in {
+  animation: fadeInStagger 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
