@@ -7,7 +7,7 @@ import {
   BarChart, Bar, 
   LineChart, Line, 
   AreaChart, Area, 
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, Sector,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ReferenceDot
 } from "recharts";
@@ -20,7 +20,7 @@ interface GraphWidgetProps {
   height?: number;
 }
 
-const COLORS = ["#A7F3D0", "#38BDF8", "#6366F1", "#312E81", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6"];
+const COLORS = ["#86F3D4", "#38BDF8", "#4E60A6", "#548CA8", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6"];
 
 const MOCK_LINE_DATA = [
   { name: "May", Deals: 5.0, Revenue: 480 },
@@ -32,10 +32,10 @@ const MOCK_LINE_DATA = [
 ];
 
 const MOCK_PIE_DATA = [
-  { name: "Direct", value: 1708.63, color: "#A7F3D0" },
+  { name: "Direct", value: 1708.63, color: "#86F3D4" },
   { name: "Paid", value: 1281.47, color: "#38BDF8" },
-  { name: "Social", value: 854.31, color: "#6366F1" },
-  { name: "Other", value: 427.16, color: "#312E81" },
+  { name: "Social", value: 854.31, color: "#4E60A6" },
+  { name: "Other", value: 427.16, color: "#548CA8" },
 ];
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -45,7 +45,7 @@ const CustomTooltip = ({ active, payload }: any) => {
         <p className="text-[#888899] mb-1 font-mono">{payload[0].payload.name}</p>
         <div className="space-y-1 font-mono">
           <p className="text-[#38BDF8] font-semibold">Deals: {payload[0].value}</p>
-          <p className="text-[#A7F3D0] font-semibold">Revenue: ${payload[1].value}</p>
+          <p className="text-[#86F3D4] font-semibold">Revenue: ${payload[1].value}</p>
         </div>
       </div>
     );
@@ -58,7 +58,7 @@ const RenderCustomizedLabel = (props: any) => {
   return (
     <g>
       {/* Vertical line indicator */}
-      <line x1={cx} y1={cy} x2={cx} y2={cy + 85} stroke="rgba(52, 211, 153, 0.35)" strokeWidth="1.25" strokeDasharray="3 3" />
+      <line x1={cx} y1={cy} x2={cx} y2={cy + 85} stroke="rgba(16, 185, 129, 0.35)" strokeWidth="1.25" strokeDasharray="3 3" />
       {/* Background Bubble */}
       <rect 
         x={cx - 20} 
@@ -66,7 +66,7 @@ const RenderCustomizedLabel = (props: any) => {
         width={40} 
         height={18} 
         rx={4} 
-        fill="#34D399" 
+        fill="#10B981" 
         filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))"
       />
       {/* Text inside bubble */}
@@ -82,8 +82,8 @@ const RenderCustomizedLabel = (props: any) => {
         $560
       </text>
       {/* Glowing point at intersection */}
-      <circle cx={cx} cy={cy} r={5} fill="#34D399" stroke="#0A0A0F" strokeWidth={1.5} />
-      <circle cx={cx} cy={cy} r={8} fill="none" stroke="#34D399" strokeWidth={1} opacity={0.5} />
+      <circle cx={cx} cy={cy} r={5} fill="#10B981" stroke="#0A0A0F" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={8} fill="none" stroke="#10B981" strokeWidth={1} opacity={0.5} />
     </g>
   );
 };
@@ -95,6 +95,33 @@ interface GraphWidgetProps {
   height?: number;
   isMock?: boolean;
 }
+
+const renderActiveShape = (props: any) => {
+  const RADIAN = Math.PI / 180;
+  const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+  const sin = Math.sin(-RADIAN * midAngle);
+  const cos = Math.cos(-RADIAN * midAngle);
+  const mx = cx + 5 * cos;
+  const my = cy + 5 * sin;
+
+  return (
+    <g>
+      <Sector
+        cx={mx}
+        cy={my}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        cornerRadius={6}
+        stroke="none"
+      />
+    </g>
+  );
+};
+
+const SafePie = Pie as any;
 
 export default function GraphWidget({ graph, rows, onDelete, height = 220, isMock: isMockProp }: GraphWidgetProps) {
   const isMock = isMockProp !== undefined ? isMockProp : (rows.length > 0 && "Campaign" in rows[0]);
@@ -219,12 +246,13 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
       if (graph.type === "line" || graph.id === "default-line") {
         return (
           <LineChart data={MOCK_LINE_DATA} margin={{ top: 15, right: 0, left: -25, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(255,255,255,0.03)" vertical={false} />
-            <XAxis dataKey="name" stroke="#333344" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
+            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
             
             <YAxis 
               yAxisId="left"
-              stroke="#333344" 
+              stroke="currentColor"
+              strokeOpacity={0.1}
               tickLine={false} 
               axisLine={false}
               domain={[2, 8]}
@@ -234,7 +262,8 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
             <YAxis 
               yAxisId="right"
               orientation="right"
-              stroke="#333344" 
+              stroke="currentColor"
+              strokeOpacity={0.1}
               tickLine={false} 
               axisLine={false}
               domain={[200, 1000]}
@@ -243,10 +272,10 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
               tick={{ fontSize: 10, fill: "#888899" }} 
             />
             
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.05)", strokeWidth: 1 }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "currentColor", strokeOpacity: 0.08, strokeWidth: 1 }} />
             
-            <Line yAxisId="left" type="monotone" dataKey="Deals" stroke="#38BDF8" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#38BDF8" }} />
-            <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#A7F3D0" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#A7F3D0" }} />
+            <Line yAxisId="left" type="monotone" dataKey="Deals" stroke="#185FA5" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#185FA5" }} />
+            <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#1D9E75" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#1D9E75" }} />
             
             <ReferenceDot yAxisId="right" x="Aug" y={560} shape={RenderCustomizedLabel} />
           </LineChart>
@@ -259,11 +288,11 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
             {/* Absolute Total Center text */}
             <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
               <span className="text-[10px] text-[#555566] font-sans font-medium uppercase tracking-wider block">Total</span>
-              <span className="text-xl font-bold text-white font-sans mt-0.5">$4,271.57</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-white font-sans mt-0.5">$4,271.57</span>
             </div>
             
             <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <Pie
+              <SafePie
                 data={MOCK_PIE_DATA}
                 cx="50%"
                 cy="40%"
@@ -271,11 +300,15 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
                 outerRadius={73}
                 paddingAngle={3}
                 dataKey="value"
+                activeIndex={0}
+                activeShape={renderActiveShape}
+                cornerRadius={6}
+                stroke="none"
               >
                 {MOCK_PIE_DATA.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
-              </Pie>
+              </SafePie>
               <Tooltip formatter={(v) => `$${Number(v).toLocaleString()}`} contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
             </PieChart>
           </div>
@@ -295,11 +328,11 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
       case "line":
         return (
           <LineChart data={chartData} margin={{ top: 15, right: 10, left: -25, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(255,255,255,0.03)" vertical={false} />
-            <XAxis dataKey="name" stroke="#333344" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
-            <YAxis stroke="#333344" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
+            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
+            <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
             <Tooltip contentStyle={{ background: "#12121A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
-            <Line type="monotone" dataKey="value" stroke="#38BDF8" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#38BDF8" }} />
+            <Line type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#1D9E75" }} />
           </LineChart>
         );
       case "area":
@@ -307,15 +340,15 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
           <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
             <defs>
               <linearGradient id={`grad-${graph.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366F1" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                <stop offset="5%" stopColor="#1D9E75" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#1D9E75" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(255,255,255,0.01)" strokeDasharray="3 3" />
-            <XAxis dataKey="name" stroke="#444455" tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
-            <YAxis stroke="#444455" tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
+            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+            <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
             <Tooltip contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "monospace", fontSize: 10 }} />
-            <Area type="monotone" dataKey="value" stroke="#6366F1" strokeWidth={2} fillOpacity={1} fill={`url(#grad-${graph.id})`} />
+            <Area type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} fillOpacity={1} fill={`url(#grad-${graph.id})`} />
           </AreaChart>
         );
       case "pie":
@@ -323,11 +356,11 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
           <div className="relative w-full h-full">
             <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
               <span className="text-[10px] text-[#555566] font-sans font-medium uppercase tracking-wider block">Total</span>
-              <span className="text-xl font-bold text-white font-sans mt-0.5">{formattedTotal}</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-white font-sans mt-0.5">{formattedTotal}</span>
             </div>
             
             <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <Pie
+              <SafePie
                 data={chartData}
                 cx="50%"
                 cy="40%"
@@ -335,11 +368,15 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
                 outerRadius={73}
                 paddingAngle={3}
                 dataKey="value"
+                activeIndex={0}
+                activeShape={renderActiveShape}
+                cornerRadius={6}
+                stroke="none"
               >
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
-              </Pie>
+              </SafePie>
               <Tooltip formatter={(v) => isCurrency ? `$${Number(v).toLocaleString()}` : Number(v).toLocaleString()} contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
             </PieChart>
           </div>
@@ -348,11 +385,11 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
       default:
         return (
           <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(255,255,255,0.01)" strokeDasharray="3 3" />
-            <XAxis dataKey="name" stroke="#444455" tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
-            <YAxis stroke="#444455" tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
+            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+            <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
             <Tooltip contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "monospace", fontSize: 10 }} />
-            <Bar dataKey="value" fill="#6366F1" radius={[3, 3, 0, 0]}>
+            <Bar dataKey="value" fill="#1D9E75" radius={[3, 3, 0, 0]}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
@@ -363,11 +400,11 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
   };
 
   return (
-    <div className="rounded-2xl p-5 border border-[rgba(255,255,255,0.06)] bg-[#111118] flex flex-col justify-between relative group shadow-lg min-w-0 w-full">
+    <div className="rounded-2xl p-5 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] flex flex-col justify-between relative group shadow-lg min-w-0 w-full transition-colors duration-150">
       {/* Header */}
       <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold text-white tracking-wide">{graph.title}</h4>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white tracking-wide">{graph.title}</h4>
         </div>
         
         {isMock && (graph.type === "line" || graph.id === "default-line") ? (
@@ -377,19 +414,19 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
               <span className="text-[#888899]">Deals</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#A7F3D0]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#86F3D4]" />
               <span className="text-[#888899]">Revenue</span>
             </div>
           </div>
         ) : isMock && (graph.type === "pie" || graph.id === "default-pie") ? (
-          <button className="p-1 rounded border border-[rgba(255,255,255,0.06)] bg-[#161622] hover:bg-[#1C1C2D] text-[#888899] hover:text-white transition-colors cursor-pointer">
+          <button className="p-1 rounded border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#161622] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] text-[#888899] hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer">
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         ) : (
           onDelete && (
             <button
               onClick={() => onDelete(graph.id)}
-              className="p-1 rounded bg-[rgba(255,255,255,0.02)] hover:bg-red-500/10 border border-[rgba(255,255,255,0.04)] hover:border-red-500/20 text-[#555566] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer"
+              className="p-1 rounded bg-[rgba(255,255,255,0.02)] hover:bg-red-500/10 border border-gray-200 dark:border-[rgba(255,255,255,0.04)] hover:border-red-500/20 text-[#555566] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-pointer"
               title="Remove Widget"
             >
               <Trash2 className="w-3 h-3" />
@@ -411,7 +448,7 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
       {isMock && (graph.type === "pie" || graph.id === "default-pie") ? (
         <div className="flex items-center justify-center gap-4 text-[10px] font-mono mt-3.5 flex-wrap">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#A7F3D0]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#86F3D4]" />
             <span className="text-[#888899]">Direct</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -419,11 +456,11 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
             <span className="text-[#888899]">Paid</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#6366F1]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#4E60A6]" />
             <span className="text-[#888899]">Social</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#312E81]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#548CA8]" />
             <span className="text-[#888899]">Other</span>
           </div>
         </div>
@@ -437,7 +474,7 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
           ))}
         </div>
       ) : (
-        <div className="mt-2.5 flex items-center justify-between text-[9px] font-mono text-[#555566] border-t border-[rgba(255,255,255,0.04)] pt-2">
+        <div className="mt-2.5 flex items-center justify-between text-[9px] font-mono text-[#555566] border-t border-gray-100 dark:border-[rgba(255,255,255,0.04)] pt-2">
           <span>X: {graph.x_col}</span>
           <span>Y: {graph.y_col}</span>
         </div>

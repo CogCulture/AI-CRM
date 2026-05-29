@@ -9,7 +9,6 @@ import urllib.parse
 # Relax oauthlib's strict scope check since Google adds openid/profile/email automatically
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
-
 router = APIRouter()
 
 def _get_token_path():
@@ -18,7 +17,7 @@ def _get_token_path():
     return os.path.join(base_dir, "token.json")
 
 @router.get("/data")
-def get_sheet_data():
+def get_sheet_data(bypass_cache: bool = False):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
     range_name = cfg.get("sheet_range", "Sheet1")
@@ -27,7 +26,7 @@ def get_sheet_data():
     is_configured = bool(sheet_url)
     
     try:
-        data = sheets_service.fetch_sheet_data(sheet_url or "mock", range_name)
+        data = sheets_service.fetch_sheet_data(sheet_url or "mock", range_name, bypass_cache=bypass_cache)
         data["configured"] = is_configured
         return data
     except Exception as e:
@@ -50,7 +49,12 @@ def oauth_auth(redirect_url: str = "http://localhost:3001/admin"):
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
         },
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "openid",
+            "email",
+            "profile"
+        ],
         redirect_uri="http://localhost:8000/api/sheets/callback"
     )
     
@@ -80,7 +84,12 @@ def oauth_callback(code: str, state: str):
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
         },
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "openid",
+            "email",
+            "profile"
+        ],
         redirect_uri="http://localhost:8000/api/sheets/callback"
     )
     
@@ -117,8 +126,71 @@ def auth_status():
         return {"authenticated": False}
     try:
         from google.oauth2.credentials import Credentials
-        creds = Credentials.from_authorized_user_file(token_path, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-        return {"authenticated": True, "expired": creds.expired}
+        creds = Credentials.from_authorized_user_file(token_path)
+        
+        import base64
+        import json as _json
+        account_info = {}
+        if creds.token:
+            with open(token_path, "r") as f:
+                raw = _json.load(f)
+            id_token = raw.get("id_token", "")
+            if id_token:
+                try:
+                    payload_b64 = id_token.split(".")[1]
+                    payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                    payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+                    account_info = {
+                        "email": payload.get("email", ""),
+                        "name": payload.get("name", ""),
+                        "picture": payload.get("picture", "")
+                    }
+                except Exception:
+                    pass
+
+        return {
+            "authenticated": True, 
+            "expired": creds.expired,
+            **account_info
+        }
     except Exception:
         return {"authenticated": False}
 
+@router.post("/lead")
+def add_lead(body: dict):
+    cfg = config_service.load_config()
+    sheet_url = cfg.get("sheet_url")
+    range_name = cfg.get("sheet_range", "Sheet1")
+    if not sheet_url:
+        raise HTTPException(status_code=400, detail="Sheet URL is not configured.")
+    try:
+        res = sheets_service.append_lead_row(sheet_url, range_name, body)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/lead/{row_num}")
+def update_lead(row_num: int, body: dict):
+    cfg = config_service.load_config()
+    sheet_url = cfg.get("sheet_url")
+    range_name = cfg.get("sheet_range", "Sheet1")
+    if not sheet_url:
+        raise HTTPException(status_code=400, detail="Sheet URL is not configured.")
+    try:
+        res = sheets_service.update_lead_row(sheet_url, range_name, row_num, body)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/lead/{row_num}")
+def delete_lead(row_num: int):
+    cfg = config_service.load_config()
+    sheet_url = cfg.get("sheet_url")
+    range_name = cfg.get("sheet_range", "Sheet1")
+    if not sheet_url:
+        raise HTTPException(status_code=400, detail="Sheet URL is not configured.")
+    try:
+        res = sheets_service.delete_lead_row(sheet_url, range_name, row_num)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

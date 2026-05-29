@@ -8,7 +8,12 @@ interface MetricCardProps {
   index?: number;
 }
 
-export default function MetricCard({ label, value, delta, index = 0 }: MetricCardProps) {
+export default function MetricCard({
+  label,
+  value,
+  delta,
+  index = 0,
+}: MetricCardProps) {
   const [displayValue, setDisplayValue] = React.useState("0");
 
   React.useEffect(() => {
@@ -51,42 +56,33 @@ export default function MetricCard({ label, value, delta, index = 0 }: MetricCar
     requestAnimationFrame(animate);
   }, [value]);
 
-  const isFirstCard = index === 0;
+  const isAccent = index === 0;
 
   return (
     <div 
-      className={`relative overflow-hidden transition-all duration-300 group rounded-2xl p-5 flex flex-col justify-between h-[125px] ${
-        isFirstCard 
-          ? "bg-gradient-to-br from-[#A7F3D0] via-[#A7F3D0] to-[#6EE7B7] text-[#062F16] border-0 shadow-[0_0_20px_rgba(110,231,183,0.15)]"
-          : "border border-[rgba(255,255,255,0.06)] bg-[#111118] text-white shadow-xl"
+      className={`relative overflow-hidden transition-colors duration-150 group p-5 flex flex-col justify-between rounded-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] text-gray-900 dark:text-white shadow-sm dark:shadow-xl ${
+        isAccent ? "border-t-2 border-t-emerald-500 dark:border-t-emerald-400" : ""
       }`}
       style={{ animationDelay: `${index * 100}ms` }}
     >
-      {/* Concentric circle wave paths for the first card */}
-      {isFirstCard && (
-        <div className="absolute inset-0 pointer-events-none opacity-45 mix-blend-overlay">
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <circle cx="85" cy="85" r="45" fill="none" stroke="white" strokeWidth="4" opacity="0.35" />
-            <circle cx="85" cy="85" r="65" fill="none" stroke="white" strokeWidth="4" opacity="0.25" />
-            <circle cx="85" cy="85" r="85" fill="none" stroke="white" strokeWidth="4" opacity="0.18" />
-            <circle cx="85" cy="85" r="105" fill="none" stroke="white" strokeWidth="4" opacity="0.12" />
-          </svg>
-        </div>
+      {/* Subtle background glow for the accent card */}
+      {isAccent && (
+        <div className="absolute -right-6 -bottom-6 w-16 h-16 rounded-full bg-emerald-500/5 blur-xl pointer-events-none" />
       )}
 
       {/* Top Row: Label and Three Dots */}
       <div className="flex items-center justify-between">
-        <span className={`text-[11px] font-sans font-medium tracking-wide ${isFirstCard ? "text-[#062F16]/75" : "text-[#888899]"}`}>
+        <span className="text-[11px] font-sans font-medium tracking-wide text-gray-500 dark:text-[#888899]">
           {label}
         </span>
-        <button className={`p-0.5 rounded transition-colors cursor-pointer ${isFirstCard ? "hover:bg-black/5 text-[#062F16]/60" : "hover:bg-white/5 text-[#555566] hover:text-white"}`}>
+        <button className="p-0.5 rounded transition-colors cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 text-[#888899] hover:text-gray-900 dark:hover:text-white">
           <MoreVertical className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Middle Row: Large Value */}
       <div className="mt-1">
-        <h3 className={`text-2xl font-bold tracking-tight ${isFirstCard ? "text-[#062F16]" : "text-white"}`}>
+        <h3 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
           {displayValue}
         </h3>
       </div>
@@ -95,11 +91,7 @@ export default function MetricCard({ label, value, delta, index = 0 }: MetricCar
       <div className="mt-1.5 flex justify-start">
         {delta && (
           <span 
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
-              isFirstCard
-                ? "bg-white/90 text-[#062F16]"
-                : "bg-[#132A21] text-[#3CD395] border border-[#1E3F33]/30"
-            }`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-[#3CD395] border border-emerald-500/20"
           >
             {delta}
           </span>

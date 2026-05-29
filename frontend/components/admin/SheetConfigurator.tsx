@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Config } from "@/lib/types";
 
-
 export default function SheetConfigurator() {
   const [config, setConfig] = useState<Config>({
     sheet_url: "",
@@ -29,7 +28,13 @@ export default function SheetConfigurator() {
     message?: string;
   } | null>(null);
 
-  const [authStatus, setAuthStatus] = useState<{ authenticated: boolean; loading: boolean }>({
+  const [authStatus, setAuthStatus] = useState<{
+    authenticated: boolean;
+    loading: boolean;
+    email?: string;
+    name?: string;
+    picture?: string;
+  }>({
     authenticated: false,
     loading: true,
   });
@@ -62,7 +67,13 @@ export default function SheetConfigurator() {
       // 2. Fetch auth status
       try {
         const auth = await api.getAuthStatus();
-        setAuthStatus({ authenticated: auth.authenticated, loading: false });
+        setAuthStatus({
+          authenticated: auth.authenticated,
+          loading: false,
+          email: auth.email,
+          name: auth.name,
+          picture: auth.picture,
+        });
       } catch (err) {
         console.error("Failed to check auth status:", err);
         setAuthStatus({ authenticated: false, loading: false });
@@ -76,7 +87,13 @@ export default function SheetConfigurator() {
         window.history.replaceState({}, document.title, window.location.pathname);
         try {
           const auth = await api.getAuthStatus();
-          setAuthStatus({ authenticated: auth.authenticated, loading: false });
+          setAuthStatus({
+            authenticated: auth.authenticated,
+            loading: false,
+            email: auth.email,
+            name: auth.name,
+            picture: auth.picture,
+          });
         } catch {}
       } else if (authResult === "failure") {
         const errorMsg = params.get("error") || "Unknown error";
@@ -207,21 +224,35 @@ export default function SheetConfigurator() {
         <div className="obsidian-glass rounded-xl p-6 border border-[rgba(255,255,255,0.06)] bg-[#0C0C12]/20 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20 text-red-400">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.99 5.99 0 0 1 8 12.5a5.99 5.99 0 0 1 5.991-6.014c1.648 0 3.125.667 4.2 1.74l3.15-3.15A10.36 10.36 0 0 0 13.99 1C8.473 1 4 5.474 4 11s4.473 10 9.991 10c6.046 0 9.99-4.25 9.99-10.16 0-.61-.06-1.125-.18-1.555H12.24z"/>
+              {/* Correct Google Sheets Logo */}
+              <div className="p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M19.875 3H4.125C3.504 3 3 3.504 3 4.125v15.75C3 20.496 3.504 21 4.125 21h15.75C20.496 21 21 20.496 21 19.875V4.125C21 3.504 20.496 3 19.875 3z" fill="#23A566"/>
+                  <path d="M7.5 9.75h9v1.5h-9zm0 3h9v1.5h-9zm0 3h5.25v1.5H7.5z" fill="#fff"/>
+                  <path d="M15 3v6h6L15 3z" fill="#16834F"/>
                 </svg>
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-wide">Google Account Authentication</h3>
-                <p className="text-xs text-[#888899]">
-                  {authStatus.loading 
-                    ? "Checking authentication status..." 
-                    : authStatus.authenticated 
-                      ? "Connected to Google. You can now access your private sheets."
-                      : "Connect your Google account to access private sheets securely."
-                  }
-                </p>
+                {authStatus.loading ? (
+                  <p className="text-xs text-[#888899]">Checking authentication status...</p>
+                ) : authStatus.authenticated ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    {authStatus.picture && (
+                      <img
+                        src={authStatus.picture}
+                        alt={authStatus.name || "Google Account"}
+                        className="w-5 h-5 rounded-full border border-green-500/30"
+                      />
+                    )}
+                    <div>
+                      <p className="text-xs font-semibold text-white">{authStatus.name || "Google Account"}</p>
+                      <p className="text-[10px] text-[#888899] font-mono">{authStatus.email || "Connected"}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#888899]">Connect your Google account to access private sheets securely.</p>
+                )}
               </div>
             </div>
 
@@ -243,11 +274,12 @@ export default function SheetConfigurator() {
                 onClick={handleGoogleSignIn}
                 className="w-full py-2.5 bg-white hover:bg-gray-100 text-gray-900 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.1)]"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M21.35,11.1H12v2.7h5.38c-0.24,1.28 -0.96,2.37 -2.04,3.1v2.58h3.3c1.93,-1.78 3.04,-4.4 3.04,-7.48C21.68,11.83 21.56,11.39 21.35,11.1z" fill="#4285F4" />
-                  <path d="M12,20.8c2.68,0 4.93,-0.89 6.58,-2.42l-3.3,-2.58c-0.91,0.61 -2.08,0.98 -3.28,0.98 -2.53,0 -4.68,-1.71 -5.44,-4.02H3.14v2.66C4.78,17.67 8.16,20.8 12,20.8z" fill="#34A853" />
-                  <path d="M6.56,12.78c-0.19,-0.57 -0.3,-1.18 -0.3,-1.8c0,-0.62 0.11,-1.23 0.3,-1.8V6.52H3.14c-0.64,1.28 -1,2.72 -1,4.26c0,1.54 0.36,2.98 1,4.26l3.42,-2.26z" fill="#FBBC05" />
-                  <path d="M12,5.18c1.46,0 2.77,0.5 3.8,1.49l2.84,-2.84C16.92,2.32 14.67,1.2 12,1.2C8.16,1.2 4.78,4.33 3.14,7.52l3.42,2.66C7.32,6.89 9.47,5.18 12,5.18z" fill="#EA4335" />
+                {/* Correct Official Google G Logo */}
+                <svg className="w-4 h-4" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+                  <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                  <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                  <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
                 </svg>
                 Sign in with Google
               </button>
@@ -258,7 +290,7 @@ export default function SheetConfigurator() {
         {/* Sync Settings Card */}
         <div className="obsidian-glass rounded-xl p-6 border border-[rgba(255,255,255,0.06)] bg-[#0C0C12]/20 shadow-xl space-y-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20 text-indigo-400">
+            <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
               <Database className="w-5 h-5" />
             </div>
             <div>
@@ -276,7 +308,7 @@ export default function SheetConfigurator() {
                 placeholder="https://docs.google.com/spreadsheets/d/.../edit"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-indigo-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
+                className="w-full px-4 py-2.5 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
               />
             </div>
 
@@ -289,7 +321,7 @@ export default function SheetConfigurator() {
                   placeholder="Sheet1"
                   value={rangeInput}
                   onChange={(e) => setRangeInput(e.target.value)}
-                  className="w-full px-4 py-2 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-indigo-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
+                  className="w-full px-4 py-2 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
                 />
               </div>
 
@@ -302,9 +334,9 @@ export default function SheetConfigurator() {
                   className="flex-1 py-2 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.06)] text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   {testing ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
                   ) : (
-                    <RefreshCw className="w-4 h-4 text-indigo-400" />
+                    <RefreshCw className="w-4 h-4 text-emerald-400" />
                   )}
                   Test Connection
                 </button>
@@ -312,7 +344,7 @@ export default function SheetConfigurator() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-750 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer"
+                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-750 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer"
                 >
                   {saving ? (
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

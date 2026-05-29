@@ -87,12 +87,12 @@ export default function ColumnManager({
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-150"
         onClick={onClose}
       />
 
       {/* Drawer Panel */}
-      <div className="w-96 bg-[#0C0C12] border-l border-[rgba(255,255,255,0.08)] h-full relative z-10 flex flex-col justify-between shadow-2xl animate-slide-in">
+      <div className="w-96 bg-white dark:bg-[#0C0C12] border-l border-gray-200 dark:border-[rgba(255,255,255,0.08)] h-full relative z-10 flex flex-col justify-between shadow-2xl animate-slide-in transition-colors duration-150">
         <style>
           {`
             @keyframes slideInRight {
@@ -106,14 +106,14 @@ export default function ColumnManager({
         </style>
 
         {/* Header */}
-        <div className="p-6 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between">
+        <div className="p-6 border-b border-gray-100 dark:border-[rgba(255,255,255,0.06)] flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-medium text-white">Configure Columns</h3>
-            <p className="text-xs text-[#888899] mt-1">Manage grid visibility and display order</p>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Configure Columns</h3>
+            <p className="text-xs text-gray-500 dark:text-[#888899] mt-1">Manage grid visibility and display order</p>
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.06)] text-[#888899] hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-[rgba(255,255,255,0.03)] dark:hover:bg-[rgba(255,255,255,0.08)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -127,10 +127,10 @@ export default function ColumnManager({
               return (
                 <div 
                   key={`${col}-${idx}`}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors duration-150 ${
                     isVisible 
-                      ? "bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] text-white" 
-                      : "bg-[#09090E]/50 border-transparent text-[#555566]"
+                      ? "bg-gray-50 dark:bg-[rgba(255,255,255,0.02)] border-gray-200 dark:border-[rgba(255,255,255,0.05)] text-gray-900 dark:text-white" 
+                      : "bg-transparent border-transparent text-gray-400 dark:text-[#555566]"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -138,8 +138,8 @@ export default function ColumnManager({
                       onClick={() => toggleVisibility(col)}
                       className={`p-1 rounded cursor-pointer transition-colors ${
                         isVisible 
-                          ? "text-indigo-400 hover:text-indigo-300 bg-indigo-500/10" 
-                          : "text-[#555566] hover:text-white"
+                          ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" 
+                          : "text-gray-400 dark:text-[#555566] hover:text-gray-900 dark:hover:text-white"
                       }`}
                     >
                       {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -151,14 +151,14 @@ export default function ColumnManager({
                     <button 
                       onClick={() => moveUp(idx)}
                       disabled={idx === 0}
-                      className="p-1 rounded text-[#888899] hover:text-white disabled:opacity-20 disabled:hover:text-[#888899] transition-colors cursor-pointer"
+                      className="p-1 rounded text-gray-400 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white disabled:opacity-20 disabled:hover:text-gray-400 dark:disabled:hover:text-[#888899] transition-colors cursor-pointer"
                     >
                       <ArrowUp className="w-3.5 h-3.5" />
                     </button>
                     <button 
                       onClick={() => moveDown(idx)}
                       disabled={idx === order.length - 1}
-                      className="p-1 rounded text-[#888899] hover:text-white disabled:opacity-20 disabled:hover:text-[#888899] transition-colors cursor-pointer"
+                      className="p-1 rounded text-gray-400 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white disabled:opacity-20 disabled:hover:text-gray-400 dark:disabled:hover:text-[#888899] transition-colors cursor-pointer"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
                     </button>
@@ -170,17 +170,17 @@ export default function ColumnManager({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[rgba(255,255,255,0.06)] flex gap-3">
+        <div className="p-6 border-t border-gray-100 dark:border-[rgba(255,255,255,0.06)] flex gap-3">
           <button 
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-lg border border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.02)] text-sm font-semibold transition-colors cursor-pointer text-center"
+            className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-[rgba(255,255,255,0.06)] hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] text-sm font-semibold transition-colors cursor-pointer text-center text-gray-700 dark:text-white"
           >
             Cancel
           </button>
           <button 
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-750 text-white text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+            className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-750 text-white text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
           >
             {saving ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

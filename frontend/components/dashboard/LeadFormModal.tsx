@@ -1,0 +1,170 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { X, Save } from "lucide-react";
+
+interface LeadFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  headers: string[];
+  initialData?: Record<string, any> | null;
+  onSave: (data: Record<string, any>) => Promise<void>;
+  title: string;
+}
+
+export default function LeadFormModal({
+  isOpen,
+  onClose,
+  headers,
+  initialData,
+  onSave,
+  title,
+}: LeadFormModalProps) {
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  // Exclude technical metadata fields and ID indices
+  const formHeaders = headers.filter(
+    (h) => h !== "_row_num" && h.toLowerCase() !== "no."
+  );
+
+  useEffect(() => {
+    if (initialData) {
+      const parsed: Record<string, string> = {};
+      formHeaders.forEach((h) => {
+        parsed[h] = String(initialData[h] || "");
+      });
+      setFormData(parsed);
+    } else {
+      const empty: Record<string, string> = {};
+      formHeaders.forEach((h) => {
+        empty[h] = "";
+      });
+      setFormData(empty);
+    }
+  }, [initialData, isOpen, headers]);
+
+  if (!isOpen) return null;
+
+  const handleChange = (header: string, val: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [header]: val,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      {/* Click outside backdrop to close */}
+      <div className="absolute inset-0" onClick={onClose} />
+
+      <div className="relative w-full max-w-xl bg-white dark:bg-[#0C0C12] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 animate-scale-in">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white font-sans tracking-wide">
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-gray-400 dark:text-[#555566] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content Form */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {formHeaders.map((header) => {
+              const hl = header.toLowerCase();
+              const isStatusDropdown = hl === "status";
+              const isStageDropdown = hl === "stage";
+              const val = formData[header] || "";
+
+              return (
+                <div key={header} className="space-y-1.5 flex flex-col">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
+                    {header}
+                  </label>
+                  
+                  {isStatusDropdown ? (
+                    <select
+                      value={val}
+                      onChange={(e) => handleChange(header, e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select Status --</option>
+                      <option value="Hot">Hot</option>
+                      <option value="Warm">Warm</option>
+                      <option value="Cold">Cold</option>
+                      <option value="Dead lead">Dead lead</option>
+                    </select>
+                  ) : isStageDropdown ? (
+                    <select
+                      value={val}
+                      onChange={(e) => handleChange(header, e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select Stage --</option>
+                      <option value="Lead">Lead</option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="Proposal sent">Proposal sent</option>
+                      <option value="Proposal to be Sent">Proposal to be Sent</option>
+                      <option value="Negotiation">Negotiation</option>
+                      <option value="Won">Won</option>
+                      <option value="Lost">Lost</option>
+                    </select>
+                  ) : (
+                    <input
+                      type={hl.includes("date") || hl.includes("deadline") ? "text" : "text"}
+                      placeholder={hl.includes("date") ? "DD/MM/YYYY" : `Enter ${header}...`}
+                      value={val}
+                      onChange={(e) => handleChange(header, e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none"
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="pt-6 border-t border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-[#dedee5] text-xs font-semibold rounded-lg transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-[#1D9E75] hover:bg-[#198763] disabled:bg-[#1D9E75]/50 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_12px_rgba(29,158,117,0.15)]"
+            >
+              {loading ? (
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

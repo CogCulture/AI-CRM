@@ -7,6 +7,7 @@ import CRMTable from "../../components/dashboard/CRMTable";
 import GraphWidget from "../../components/dashboard/GraphWidget";
 import GraphBuilder from "../../components/dashboard/GraphBuilder";
 import EmptyState from "../../components/dashboard/EmptyState";
+import LeadFormModal from "../../components/dashboard/LeadFormModal";
 import { api } from "../../lib/api";
 import { SheetData, DashboardSummary, GraphConfig } from "../../lib/types";
 import { toast } from "sonner";
@@ -20,11 +21,16 @@ export default function DashboardPage() {
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  async function loadData(showToast = false) {
+  // Lead modal states
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Record<string, any> | null>(null);
+  const [modalTitle, setModalTitle] = useState("Add New Lead");
+
+  async function loadData(showToast = false, bypassCache = false) {
     try {
       const [sum, data] = await Promise.all([
-        api.getDashboardSummary(),
-        api.getSheetData(),
+        api.getDashboardSummary(bypassCache),
+        api.getSheetData(bypassCache),
       ]);
       setSummary(sum);
       setSheetData(data);
@@ -45,7 +51,7 @@ export default function DashboardPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData(true);
+    await loadData(true, true);
   };
 
   const handleLoadMock = async () => {
@@ -99,6 +105,60 @@ export default function DashboardPage() {
     await api.updateConfig({
       graphs: updatedGraphs,
     });
+  };
+
+  const handleAddLead = () => {
+    setSelectedLead(null);
+    setModalTitle("Add New Lead");
+    setIsLeadModalOpen(true);
+  };
+
+  const handleEditLead = (row: Record<string, any>) => {
+    setSelectedLead(row);
+    setModalTitle("Edit Lead");
+    setIsLeadModalOpen(true);
+  };
+
+  const handleDeleteLead = async (row: Record<string, any>) => {
+    const rowNum = row._row_num;
+    if (!rowNum) {
+      toast.error("Invalid lead row index");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this lead? This will permanently remove the row from the Google Sheet."
+    );
+    if (!confirmed) return;
+
+    try {
+      setRefreshing(true);
+      await api.deleteLead(rowNum);
+      toast.success("Lead deleted successfully");
+      await loadData(false, true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete lead");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleSaveLead = async (leadDataInput: Record<string, any>) => {
+    try {
+      setRefreshing(true);
+      if (selectedLead && selectedLead._row_num) {
+        await api.updateLead(selectedLead._row_num, leadDataInput);
+        toast.success("Lead updated successfully");
+      } else {
+        await api.addLead(leadDataInput);
+        toast.success("Lead added successfully");
+      }
+      await loadData(false, true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save lead");
+      throw err;
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (loading) {
@@ -168,7 +228,7 @@ export default function DashboardPage() {
           {/* Dashboard Title & Actions */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-sans text-2xl text-white font-bold tracking-tight">
+              <h1 className="font-sans text-2xl text-gray-900 dark:text-white font-bold tracking-tight">
                 Dashboard
               </h1>
             </div>
@@ -176,21 +236,28 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               {/* Mockup Search Bar */}
               <div className="relative w-60">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#555566]" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-[#555566]" />
                 <input
                   type="text"
                   placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-1.5 text-xs bg-[#161622] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)] focus:border-indigo-500 rounded-full text-white placeholder-[#555566] transition-all outline-none font-sans"
+                  className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-100 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] hover:border-gray-300 dark:hover:border-[rgba(255,255,255,0.12)] focus:border-emerald-500 rounded-full text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555566] transition-all outline-none font-sans"
                 />
               </div>
 
               {!sheetData?.is_mock && (
                 <>
                   <button
+                    onClick={handleAddLead}
+                    className="px-3 py-1.5 bg-white dark:bg-[#111118] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] text-gray-700 dark:text-white border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer"
+                  >
+                    + Add Lead
+                  </button>
+
+                  <button
                     onClick={() => setIsBuilderOpen(true)}
-                    className="px-3.5 py-2 border border-indigo-500/30 hover:border-indigo-500 text-indigo-400 hover:text-indigo-300 bg-indigo-950/10 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-[#1D9E75] hover:bg-[#198763] text-white rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer shadow-[0_0_12px_rgba(29,158,117,0.15)]"
                   >
                     + Add Widget
                   </button>
@@ -198,9 +265,9 @@ export default function DashboardPage() {
                   <button
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="p-2 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.06)] text-white hover:text-indigo-400 rounded-lg transition-all cursor-pointer flex items-center gap-2 text-xs font-mono"
+                    className="p-1.5 bg-white dark:bg-[rgba(255,255,255,0.03)] hover:bg-gray-50 dark:hover:bg-[rgba(255,255,255,0.08)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-700 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-xs font-sans"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-indigo-400" : ""}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-emerald-500 dark:text-emerald-400" : ""}`} />
                     Sync Now
                   </button>
                 </>
@@ -208,66 +275,72 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Row 1: 2x2 KPIs (Left) + Primary Line Chart (Right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {/* 2x2 KPI Grid */}
-            <div className="lg:col-span-1 grid grid-cols-2 gap-4 h-full content-between">
-              {summary && summary.kpis && summary.kpis.slice(0, 4).map((kpi, index) => (
-                <MetricCard
-                  key={kpi.label}
-                  label={kpi.label}
-                  value={String(kpi.value)}
-                  delta={kpi.delta}
-                  index={index}
-                />
-              ))}
-              {summary && summary.kpis && summary.kpis.length < 4 && Array.from({ length: 4 - summary.kpis.length }).map((_, i) => (
-                <div key={i} className="obsidian-glass border border-[rgba(255,255,255,0.03)] rounded-xl p-4 bg-[#0C0C12]/10 h-24 flex items-center justify-center text-xs text-[#555566] font-mono">
-                  Empty Slot
-                </div>
-              ))}
-            </div>
+          {/* Row 1: 4 Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, index) => {
+              const kpi = summary?.kpis?.[index];
 
+              if (kpi) {
+                return (
+                  <MetricCard
+                    key={kpi.label}
+                    label={kpi.label}
+                    value={String(kpi.value)}
+                    delta={kpi.delta}
+                    index={index}
+                  />
+                );
+              } else {
+                return (
+                  <div key={index} className="h-full min-h-[110px] flex items-center justify-center text-xs text-gray-400 dark:text-[#555566] font-mono border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] rounded-2xl shadow-sm">
+                    Empty Slot
+                  </div>
+                );
+              }
+            })}
+          </div>
+
+          {/* Row 2: Charts (Line Chart + Donut Chart side-by-side) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
             {/* Line/Area Graph */}
-            <div className="lg:col-span-2 h-full flex flex-col justify-between min-w-0">
+            <div className="lg:col-span-2 min-w-0">
               {sheetData && (
                 <GraphWidget
                   graph={primaryLineGraph}
                   rows={sheetData.rows}
                   onDelete={primaryLineGraph.id !== "default-line" ? handleDeleteGraph : undefined}
-                  height={190}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Row 2: Table (Left) + Donut Chart (Right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {/* Table */}
-            <div className="lg:col-span-2 overflow-hidden">
-              {sheetData && (
-                <CRMTable
-                  headers={sheetData.headers}
-                  rows={sheetData.rows}
-                  visibleColumns={summary?.visible_columns || []}
-                  columnOrder={summary?.column_order || []}
-                  onSaveConfig={handleSaveTableConfig}
-                  searchTerm={searchTerm}
+                  height={260}
                 />
               )}
             </div>
 
             {/* Donut Chart */}
-            <div className="lg:col-span-1 min-w-0 flex flex-col justify-between">
+            <div className="lg:col-span-1 min-w-0 flex flex-col">
               {sheetData && (
                 <GraphWidget
                   graph={primaryPieGraph}
                   rows={sheetData.rows}
                   onDelete={primaryPieGraph.id !== "default-pie" ? handleDeleteGraph : undefined}
-                  height={225}
+                  height={260}
                 />
               )}
             </div>
+          </div>
+
+          {/* Row 3: Campaign Performance Table (Full Width) */}
+          <div className="w-full">
+            {sheetData && (
+              <CRMTable
+                headers={sheetData.headers}
+                rows={sheetData.rows}
+                visibleColumns={summary?.visible_columns || []}
+                columnOrder={summary?.column_order || []}
+                onSaveConfig={handleSaveTableConfig}
+                searchTerm={searchTerm}
+                onEdit={!sheetData?.is_mock ? handleEditLead : undefined}
+                onDelete={!sheetData?.is_mock ? handleDeleteLead : undefined}
+              />
+            )}
           </div>
 
           {/* Row 3: Extra Graphs (If any) */}
@@ -296,6 +369,18 @@ export default function DashboardPage() {
               headers={sheetData.headers}
               rows={sheetData.rows}
               onSave={handleAddGraph}
+            />
+          )}
+
+          {/* Lead CRUD Modal */}
+          {sheetData && (
+            <LeadFormModal
+              isOpen={isLeadModalOpen}
+              onClose={() => setIsLeadModalOpen(false)}
+              headers={sheetData.headers}
+              initialData={selectedLead}
+              onSave={handleSaveLead}
+              title={modalTitle}
             />
           )}
         </div>

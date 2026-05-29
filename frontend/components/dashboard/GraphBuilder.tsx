@@ -22,6 +22,7 @@ export default function GraphBuilder({
 }: GraphBuilderProps) {
   const [type, setType] = useState<"bar" | "line" | "pie" | "area">("bar");
   const [xCol, setXCol] = useState(headers[0] || "");
+  
   // Find likely numeric columns for default Y column
   const numericHeaders = headers.filter(h => {
     return rows.some(r => {
@@ -79,12 +80,12 @@ export default function GraphBuilder({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-150"
         onClick={onClose}
       />
 
       {/* Modal Card */}
-      <div className="bg-[#0C0C12] border border-[rgba(255,255,255,0.08)] rounded-xl w-full max-w-lg relative z-10 flex flex-col justify-between shadow-2xl overflow-hidden animate-zoom-in">
+      <div className="bg-white dark:bg-[#0C0C12] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] rounded-xl w-full max-w-lg relative z-10 flex flex-col justify-between shadow-2xl overflow-hidden animate-zoom-in transition-colors duration-150">
         <style>
           {`
             @keyframes zoomIn {
@@ -98,14 +99,14 @@ export default function GraphBuilder({
         </style>
 
         {/* Header */}
-        <div className="p-6 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between">
+        <div className="p-6 border-b border-gray-150 dark:border-[rgba(255,255,255,0.06)] flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-medium text-white">Create Performance Widget</h3>
-            <p className="text-xs text-[#888899] mt-1">Configure parameters to plot visual aggregates</p>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Create Performance Widget</h3>
+            <p className="text-xs text-gray-500 dark:text-[#888899] mt-1">Configure parameters to plot visual aggregates</p>
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.06)] text-[#888899] hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-[rgba(255,255,255,0.03)] dark:hover:bg-[rgba(255,255,255,0.08)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -116,20 +117,20 @@ export default function GraphBuilder({
           <div className="p-6 space-y-5">
             {/* Widget Title */}
             <div className="space-y-1.5">
-              <label className="text-xs font-mono uppercase tracking-wider text-[#888899]">Widget Title</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Widget Title</label>
               <input
                 type="text"
                 placeholder="e.g. Sales Pipeline by Deal Stage"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-indigo-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
+                className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 focus:border-emerald-500 dark:bg-[rgba(255,255,255,0.02)] dark:border-[rgba(255,255,255,0.06)] rounded-lg text-gray-900 dark:text-white font-mono placeholder-[#555566] transition-all outline-none"
               />
             </div>
 
             {/* Type selector */}
             <div className="space-y-2">
-              <label className="text-xs font-mono uppercase tracking-wider text-[#888899] block">Chart Type</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899] block">Chart Type</label>
               <div className="grid grid-cols-4 gap-3">
                 {chartTypes.map((item) => {
                   const Icon = item.icon;
@@ -139,10 +140,10 @@ export default function GraphBuilder({
                       key={item.id}
                       type="button"
                       onClick={() => setType(item.id)}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all duration-150 cursor-pointer ${
                         isSelected 
-                          ? "bg-indigo-600/10 border-indigo-500 text-indigo-400" 
-                          : "bg-[rgba(255,255,255,0.01)] border-[rgba(255,255,255,0.04)] text-[#888899] hover:text-white hover:bg-[rgba(255,255,255,0.03)]"
+                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400" 
+                          : "bg-gray-50/50 dark:bg-[rgba(255,255,255,0.01)] border-gray-200 dark:border-[rgba(255,255,255,0.04)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.03)]"
                       }`}
                     >
                       <Icon className="w-5 h-5 mb-1" />
@@ -156,11 +157,11 @@ export default function GraphBuilder({
             {/* X Axis dropdown */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-[#888899]">Label Axis (X)</label>
+                <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Label Axis (X)</label>
                 <select
                   value={xCol}
                   onChange={(e) => setXCol(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-[#0E0E14] border border-[rgba(255,255,255,0.06)] rounded-lg text-[#dedee5] font-mono outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0E0E14] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-lg text-gray-800 dark:text-[#dedee5] font-mono outline-none focus:border-emerald-500"
                 >
                   {headers.map((h, idx) => (
                     <option key={`${h}-${idx}`} value={h}>{h}</option>
@@ -170,11 +171,11 @@ export default function GraphBuilder({
 
               {/* Y Axis dropdown */}
               <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-[#888899]">Value Axis (Y)</label>
+                <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Value Axis (Y)</label>
                 <select
                   value={yCol}
                   onChange={(e) => setYCol(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-[#0E0E14] border border-[rgba(255,255,255,0.06)] rounded-lg text-[#dedee5] font-mono outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0E0E14] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-lg text-gray-800 dark:text-[#dedee5] font-mono outline-none focus:border-emerald-500"
                 >
                   {headers.map((h, idx) => (
                     <option key={`${h}-${idx}`} value={h}>
@@ -187,18 +188,18 @@ export default function GraphBuilder({
           </div>
 
           {/* Footer Actions */}
-          <div className="p-6 border-t border-[rgba(255,255,255,0.06)] bg-[#0A0A0F]/50 flex gap-3">
+          <div className="p-6 border-t border-gray-150 dark:border-[rgba(255,255,255,0.06)] bg-gray-50/50 dark:bg-[#0A0A0F]/50 flex gap-3">
             <button 
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 rounded-lg border border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.02)] text-sm font-semibold transition-colors cursor-pointer text-center text-white"
+              className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-[rgba(255,255,255,0.06)] hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] text-sm font-semibold transition-colors cursor-pointer text-center text-gray-700 dark:text-white"
             >
               Cancel
             </button>
             <button 
               type="submit"
               disabled={saving}
-              className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-750 text-white text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+              className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-750 text-white text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
             >
               {saving ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

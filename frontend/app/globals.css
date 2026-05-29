@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-surface: rgba(255, 255, 255, 0.04);
   --color-border-lux: rgba(255, 255, 255, 0.08);
-  --color-accent: #6366f1;
-  --color-accent-light: #a5b4fc;
+  --color-accent: #10b981;
+  --color-accent-light: #a7f3d0;
   --color-base: #0a0a0f;
   --color-text-primary: #f1f1f5;
   --color-text-secondary: #888899;
@@ -14,35 +16,53 @@
 }
 
 :root {
-  --background: #0A0A0F;
+  --background: #FFFFFF;
+  --foreground: #0A0A0F;
+}
+
+.dark {
+  --background: #08080C;
   --foreground: #F1F1F5;
 }
 
 body {
-  background-color: #08080C;
-  color: #F1F1F5;
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   overflow-x: hidden;
   background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.02) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(165, 180, 252, 0.02) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.02) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(167, 243, 208, 0.02) 0px, transparent 50%);
   background-attachment: fixed;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 /* Obsidian Premium Card Utility */
 .obsidian-glass {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.05);
+}
+
+.dark .obsidian-glass {
   background: #0E0E14;
   border: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.4);
 }
 
 .obsidian-glass-hover {
-  transition: all 0.25s ease;
+  transition: all 0.15s ease;
 }
 .obsidian-glass-hover:hover {
+  background: #fcfcfd;
+  border-color: rgba(16, 185, 129, 0.2);
+  box-shadow: 0 4px 24px 0 rgba(16, 185, 129, 0.03);
+}
+
+.dark .obsidian-glass-hover:hover {
   background: #111119;
-  border-color: rgba(99, 102, 241, 0.2);
-  box-shadow: 0 4px 24px 0 rgba(99, 102, 241, 0.03);
+  border-color: rgba(16, 185, 129, 0.2);
+  box-shadow: 0 4px 24px 0 rgba(16, 185, 129, 0.03);
 }
 
 /* Custom Scrollbars */
@@ -58,7 +78,7 @@ body {
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(16, 185, 129, 0.3);
 }
 
 /* Recharts Custom Styling */

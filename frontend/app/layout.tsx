@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, DM_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "next-themes";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,11 +34,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${dmMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#0A0A0F] text-[#F1F1F5] antialiased">
-        {children}
-        <Toaster theme="dark" closeButton position="top-right" richColors />
+      <body className="min-h-full flex flex-col antialiased transition-colors duration-150">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+          <Toaster closeButton position="top-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );
