@@ -427,18 +427,22 @@ function DashboardContent() {
 
       let isWon = false;
       let isActive = false;
+      let isCold = false;
       stgVals.forEach(stg => {
         if (["won", "closed won", "converted", "completed", "hired", "success"].some(x => stg.includes(x))) {
           isWon = true;
         }
-        if (["proposal", "negotiation", "active", "discovery", "follow-up", "warm", "contacted"].some(x => stg.includes(x))) {
+        if (["cold", "dead", "lost"].some(x => stg.includes(x))) {
+          isCold = true;
+        }
+        if (["proposal", "negotiation", "active", "discovery", "follow-up", "warm", "hot", "contacted", "lead"].some(x => stg.includes(x))) {
           isActive = true;
         }
       });
 
       if (isWon) {
         closedWonCount++;
-      } else if (isActive) {
+      } else if (isActive && !isCold) {
         activeCount++;
       }
     });
