@@ -87,7 +87,7 @@ function LoginContent() {
     setSigningIn(true);
     setErrorMsg(null);
     const redirectUrl = `${window.location.origin}/dashboard`;
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const backendUrl = "";
     window.location.href = `${backendUrl}/api/sheets/auth?redirect_url=${encodeURIComponent(redirectUrl)}`;
   };
 

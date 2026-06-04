@@ -1,6 +1,6 @@
 import { SheetData, Config, DashboardSummary } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const BASE = "";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
