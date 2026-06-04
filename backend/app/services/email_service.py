@@ -158,3 +158,133 @@ def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline:
 </html>
 """
     return send_email(to_email, subject, html_content)
+
+def send_followup_reminder(to_email: str, poc_name: str, company: str, followup_date: str, amount: str) -> bool:
+    """Dispatch a professional email reminder for an upcoming lead follow-up date."""
+    subject = f"Action Required: Follow-up Scheduled for {company}"
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f9fa;
+            margin: 0;
+            padding: 0;
+            color: #333333;
+        }}
+        .container {{
+            max-width: 600px;
+            margin: 30px auto;
+            background: #ffffff;
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }}
+        .header {{
+            background: #0f766e;
+            color: #ffffff;
+            padding: 30px;
+            text-align: center;
+        }}
+        .header h1 {{
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }}
+        .content {{
+            padding: 35px;
+            line-height: 1.6;
+        }}
+        .greeting {{
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }}
+        .details-box {{
+            background-color: #f8fafc;
+            border-left: 4px solid #0d9488;
+            padding: 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 25px 0;
+        }}
+        .details-row {{
+            display: flex;
+            margin-bottom: 8px;
+        }}
+        .details-row:last-child {{
+            margin-bottom: 0;
+        }}
+        .label {{
+            font-weight: 600;
+            width: 130px;
+            color: #475569;
+        }}
+        .value {{
+            color: #0f172a;
+        }}
+        .cta-btn {{
+            display: inline-block;
+            background-color: #10b981;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            margin: 20px 0;
+            text-align: center;
+        }}
+        .footer {{
+            background-color: #f1f5f9;
+            color: #64748b;
+            padding: 20px;
+            text-align: center;
+            font-size: 11px;
+            border-top: 1px solid #e2e8f0;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Follow-up Reminder Alert</h1>
+        </div>
+        <div class="content">
+            <div class="greeting">Hi {poc_name},</div>
+            <p>This is an automated reminder that the scheduled follow-up date for one of your assigned leads is tomorrow. Please review the details below and take the next necessary actionable steps.</p>
+            
+            <div class="details-box">
+                <div class="details-row">
+                    <span class="label">Company:</span>
+                    <span class="value"><strong>{company}</strong></span>
+                </div>
+                <div class="details-row">
+                    <span class="label">Follow-up Date:</span>
+                    <span class="value" style="color: #0d9488; font-weight: bold;">{followup_date}</span>
+                </div>
+                {f'''<div class="details-row">
+                    <span class="label">Est. Revenue:</span>
+                    <span class="value" style="color: #10b981; font-weight: bold;">{amount}</span>
+                </div>''' if amount else ''}
+            </div>
+
+            <p style="margin-top: 25px;">You can view and manage all lead status records directly via the Live CRM Dashboard.</p>
+            
+            <div style="text-align: center;">
+                <a href="http://localhost:3000/dashboard" class="cta-btn">Open CRM Dashboard</a>
+            </div>
+            
+            <p style="font-size: 12px; color: #64748b; margin-top: 30px;">Thanks,<br>Obsidian CRM Automated Alerts</p>
+        </div>
+        <div class="footer">
+            This is an automated system email from aryan@cogculture.agency. Please do not reply directly to this message.
+        </div>
+    </div>
+</body>
+</html>
+"""
+    return send_email(to_email, subject, html_content)

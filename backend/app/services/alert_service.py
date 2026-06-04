@@ -33,19 +33,18 @@ def parse_date(date_str: str):
             
     return None
 
-def is_deadline_tomorrow(date_str: str) -> bool:
-    """Check if the deadline date is exactly tomorrow (1 day ahead of local time)."""
+def is_date_tomorrow(date_str: str) -> bool:
+    """Check if the given date is exactly tomorrow (1 day ahead of local time)."""
     parsed = parse_date(date_str)
     if not parsed:
         return False
     # Check against local date offset (+05:30)
-    # Since current local time is provided, we can fetch today's date in local time or simple utc
     today_local = (datetime.utcnow() + timedelta(hours=5.5)).date()
     tomorrow_local = today_local + timedelta(days=1)
     return parsed == tomorrow_local
 
 def check_and_send_alerts() -> int:
-    """Scan all sheet rows, find approaching deadlines, and send email reminders."""
+    """Scan all sheet rows, find approaching deadlines/follow-ups, and send email reminders."""
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
     range_name = cfg.get("sheet_range", "Sheet1")
@@ -65,46 +64,76 @@ def check_and_send_alerts() -> int:
     
     # Locate column headers (case-insensitive matches)
     deadline_header = next((h for h in headers if "deadline" in h.lower() or "due" in h.lower()), "")
+    followup_header = next((h for h in headers if "follow" in h.lower() or "followup" in h.lower() or "follow up" in h.lower()), "")
+    stage_header = next((h for h in headers if h.lower() == "stage" or "stage" in h.lower()), "")
     poc_header = next((h for h in headers if h.lower() == "cs poc" or h.lower() == "poc" or "poc" in h.lower()), "")
     email_header = next((h for h in headers if "poc email" in h.lower() or "email" in h.lower()), "")
     company_header = next((h for h in headers if h.lower() == "company" or "company" in h.lower() or "campaign" in h.lower()), "")
     value_header = next((h for h in headers if "value" in h.lower() or "amount" in h.lower() or "revenue" in h.lower() or "estimated" in h.lower()), "")
     
-    if not deadline_header or not email_header:
-        print(f"Required headers missing for alerts (Deadline: '{deadline_header}', POC Email: '{email_header}').")
+    if not email_header:
+        print("POC Email header is missing for alerts.")
         return 0
         
     sent_count = 0
     for row in rows:
-        deadline_val = row.get(deadline_header, "")
+        company = row.get(company_header, "Unnamed Lead")
+        poc_name = row.get(poc_header, "Lead Owner")
+        poc_email = row.get(email_header, "").strip()
+        amount = row.get(value_header, "")
         
-        if is_deadline_tomorrow(deadline_val):
-            company = row.get(company_header, "Unnamed Lead")
-            poc_name = row.get(poc_header, "Lead Owner")
-            poc_email = row.get(email_header, "").strip()
-            amount = row.get(value_header, "")
+        if not poc_email:
+            print(f"Skipping alert for {company}: POC email is empty.")
+            continue
             
-            if not poc_email:
-                print(f"Skipping alert for {company}: POC email is empty.")
+        stage_val = str(row.get(stage_header, "")).lower().strip()
+        
+        # Decide checking logic based on stage
+        is_deadline_stage = stage_val in ["proposal to be sent", "portfolio to be sent"]
+        
+        if is_deadline_stage:
+            if not deadline_header:
+                print(f"Skipping alert for {company}: Stage is '{stage_val}' but Deadline header is missing.")
                 continue
-                
-            # Check SQLite if already notified
-            if db_service.has_sent_reminder(company, deadline_val):
-                print(f"Reminder already sent for {company} deadline: {deadline_val}")
+            date_val = row.get(deadline_header, "")
+            is_tomorrow = is_date_tomorrow(date_val)
+            alert_type = "deadline"
+        else:
+            if not followup_header:
+                print(f"Skipping alert for {company}: Stage is '{stage_val}' but Follow Up header is missing.")
+                continue
+            date_val = row.get(followup_header, "")
+            is_tomorrow = is_date_tomorrow(date_val)
+            alert_type = "followup"
+            
+        if is_tomorrow:
+            # Check database to see if we already sent an reminder for this date/type
+            reminder_key = f"{alert_type}:{date_val}"
+            if db_service.has_sent_reminder(company, reminder_key):
+                print(f"Reminder already sent for {company} {alert_type}: {date_val}")
                 continue
                 
             # Send the email alert
-            success = email_service.send_deadline_reminder(
-                to_email=poc_email,
-                poc_name=poc_name,
-                company=company,
-                deadline=deadline_val,
-                amount=amount
-            )
-            
+            if alert_type == "deadline":
+                success = email_service.send_deadline_reminder(
+                    to_email=poc_email,
+                    poc_name=poc_name,
+                    company=company,
+                    deadline=date_val,
+                    amount=amount
+                )
+            else:
+                success = email_service.send_followup_reminder(
+                    to_email=poc_email,
+                    poc_name=poc_name,
+                    company=company,
+                    followup_date=date_val,
+                    amount=amount
+                )
+                
             if success:
                 # Mark as sent
-                db_service.mark_reminder_sent(company, deadline_val)
+                db_service.mark_reminder_sent(company, reminder_key)
                 sent_count += 1
                 
     return sent_count
