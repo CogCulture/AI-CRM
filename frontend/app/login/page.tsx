@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, ShieldAlert, Sparkles, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
@@ -27,6 +27,20 @@ function isWorkEmail(email: string): boolean {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen w-screen items-center justify-center bg-[#0A0A0F] text-white">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <span className="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Loading Security Gate...</span>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [checking, setChecking] = useState(true);
