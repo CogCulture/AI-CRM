@@ -165,47 +165,32 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] p-5 shadow-xl transition-colors duration-150 flex flex-col md:flex-row gap-6 w-full h-full">
       {/* Left side: Metrics Cards */}
-      <div className="flex flex-col gap-3 w-full md:w-72 shrink-0 justify-center">
+      <div className="flex flex-col gap-3.5 w-full md:w-72 shrink-0 justify-between">
         {/* Total Estimated Revenue Card */}
-        <div className="p-3.5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between h-20 shadow-sm">
+        <div className="flex-1 p-5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between shadow-sm min-h-[110px]">
           <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899] font-sans">
             Total Estimated Revenue
           </span>
-          <div className="flex items-baseline justify-between mt-1">
-            <span className="text-base font-bold text-blue-600 dark:text-[#38BDF8] font-sans flex items-center gap-1">
+          <div className="flex items-baseline justify-between mt-2">
+            <span className="text-xl font-bold text-blue-600 dark:text-[#38BDF8] font-sans flex items-center gap-1">
               {formatCurrency(totalEstimatedRevenue)}
             </span>
-            <span className="text-[9px] font-bold text-blue-500 flex items-center font-mono">
+            <span className="text-[10px] font-bold text-blue-500 flex items-center font-mono">
               ↑ 0%
             </span>
           </div>
         </div>
 
         {/* Won Revenue Card */}
-        <div className="p-3.5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between h-20 shadow-sm">
+        <div className="flex-1 p-5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between shadow-sm min-h-[110px]">
           <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899] font-sans">
             Won Revenue
           </span>
-          <div className="flex items-baseline justify-between mt-1">
-            <span className="text-base font-bold font-sans flex items-center gap-1" style={{ color: "#1D9E75" }}>
+          <div className="flex items-baseline justify-between mt-2">
+            <span className="text-xl font-bold font-sans flex items-center gap-1" style={{ color: "#1D9E75" }}>
               +{formatCurrency(wonRevenue)}
             </span>
-            <span className="text-[9px] font-bold flex items-center font-mono" style={{ color: "#1D9E75" }}>
-              ↑ 0%
-            </span>
-          </div>
-        </div>
-
-        {/* Lost Revenue Card */}
-        <div className="p-3.5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between h-20 shadow-sm">
-          <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899] font-sans">
-            Lost Revenue
-          </span>
-          <div className="flex items-baseline justify-between mt-1">
-            <span className="text-base font-bold font-sans flex items-center gap-1" style={{ color: "#EF4444" }}>
-              -{formatCurrency(lostRevenue)}
-            </span>
-            <span className="text-[9px] font-bold flex items-center font-mono" style={{ color: "#EF4444" }}>
+            <span className="text-[10px] font-bold flex items-center font-mono" style={{ color: "#1D9E75" }}>
               ↑ 0%
             </span>
           </div>
