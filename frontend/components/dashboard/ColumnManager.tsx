@@ -21,8 +21,9 @@ export default function ColumnManager({
   columnOrder,
   onSave,
 }: ColumnManagerProps) {
-  // If order is empty, default to allHeaders
-  const currentOrder = columnOrder.length > 0 ? columnOrder : [...allHeaders];
+  // Filter the saved columnOrder to only include headers that exist in the currently connected sheet
+  const filteredSavedOrder = columnOrder.filter(h => allHeaders.includes(h));
+  const currentOrder = [...filteredSavedOrder];
   
   // Make sure any missing headers are added to the end of the order
   allHeaders.forEach(h => {
@@ -33,10 +34,11 @@ export default function ColumnManager({
 
   const [order, setOrder] = useState<string[]>([...currentOrder]);
   const [visible, setVisible] = useState<string[]>(() => {
-    if (visibleColumns.length === 0) return [...allHeaders];
-    const initialVisible = [...visibleColumns];
+    const filteredVisible = visibleColumns.filter(h => allHeaders.includes(h));
+    if (filteredVisible.length === 0) return [...allHeaders];
+    const initialVisible = [...filteredVisible];
     allHeaders.forEach(h => {
-      if (!visibleColumns.includes(h) && !columnOrder.includes(h) && !initialVisible.includes(h)) {
+      if (!filteredVisible.includes(h) && !columnOrder.includes(h) && !initialVisible.includes(h)) {
         initialVisible.push(h);
       }
     });
