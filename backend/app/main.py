@@ -38,7 +38,13 @@ async def schedule_daily_alerts_check():
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(schedule_daily_alerts_check())
+    import os
+    run_scheduler = os.environ.get("RUN_BACKGROUND_SCHEDULER", "true").lower() == "true"
+    if run_scheduler:
+        print("Starting background daily alert check loop...")
+        asyncio.create_task(schedule_daily_alerts_check())
+    else:
+        print("Background alert check loop disabled (Production HTTP Scheduler target mode active).")
 
 @app.get("/debug-cors")
 def debug_cors():

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from app.services import config_service, sheets_service
 
 router = APIRouter()
@@ -140,8 +140,13 @@ def get_summary(bypass_cache: bool = False):
 
 
 @router.post("/trigger-reminders")
-def trigger_reminders():
-    """Manual trigger to scan and send deadline email reminders immediately."""
+def trigger_reminders(x_cron_key: str = Header(None)):
+    """Manual trigger to scan and send deadline email reminders immediately, secured by secret key in production."""
+    import os
+    expected_key = os.environ.get("CRON_SECRET_KEY")
+    if expected_key and x_cron_key != expected_key:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid cron secret key")
+        
     from app.services.alert_service import check_and_send_alerts
     try:
         sent_count = check_and_send_alerts()
