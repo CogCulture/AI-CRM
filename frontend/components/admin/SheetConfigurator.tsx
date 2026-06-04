@@ -106,7 +106,7 @@ export default function SheetConfigurator() {
 
   const handleGoogleSignIn = () => {
     const redirectUrl = `${window.location.origin}/admin`;
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "";
     window.location.href = `${backendUrl}/api/sheets/auth?redirect_url=${encodeURIComponent(redirectUrl)}`;
   };
 
