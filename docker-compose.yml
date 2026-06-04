@@ -10,6 +10,7 @@ services:
       - ./backend/.env
     environment:
       - RUN_BACKGROUND_SCHEDULER=true
+      - GOOGLE_REDIRECT_URI=https://crm.cogculture.agency/api/sheets/callback
     restart: always
 
   frontend:
