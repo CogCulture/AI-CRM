@@ -71,7 +71,6 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Revenue Analytics", href: "/dashboard?tab=revenue", icon: TrendingUp },
     { name: "Data Platform", href: "/dashboard?tab=data", icon: Database },
   ];
 
