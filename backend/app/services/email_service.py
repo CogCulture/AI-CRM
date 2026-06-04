@@ -145,7 +145,7 @@ def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline:
             <p style="margin-top: 25px;">You can view and manage all lead status records directly via the Live CRM Dashboard.</p>
             
             <div style="text-align: center;">
-                <a href="http://localhost:3000/dashboard" class="cta-btn">Open CRM Dashboard</a>
+                <a href="https://crm.cogculture.agency/dashboard" class="cta-btn">Open CRM Dashboard</a>
             </div>
             
             <p style="font-size: 12px; color: #64748b; margin-top: 30px;">Thanks,<br>Obsidian CRM Automated Alerts</p>
@@ -275,7 +275,7 @@ def send_followup_reminder(to_email: str, poc_name: str, company: str, followup_
             <p style="margin-top: 25px;">You can view and manage all lead status records directly via the Live CRM Dashboard.</p>
             
             <div style="text-align: center;">
-                <a href="http://localhost:3000/dashboard" class="cta-btn">Open CRM Dashboard</a>
+                <a href="https://crm.cogculture.agency/dashboard" class="cta-btn">Open CRM Dashboard</a>
             </div>
             
             <p style="font-size: 12px; color: #64748b; margin-top: 30px;">Thanks,<br>Obsidian CRM Automated Alerts</p>
