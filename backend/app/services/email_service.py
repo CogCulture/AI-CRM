@@ -29,7 +29,7 @@ def send_email(to_email: str, subject: str, html_content: str) -> bool:
         print(f"Failed to send email to {to_email}: {e}")
         return False
 
-def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline: str, amount: str) -> bool:
+def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline: str, stage: str) -> bool:
     """Dispatch a professional email reminder for an upcoming lead deadline."""
     subject = f"Urgent Action Required: Deadline Approaching for {company}"
     
@@ -137,9 +137,9 @@ def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline:
                     <span class="value" style="color: #ef4444; font-weight: bold;">{deadline}</span>
                 </div>
                 {f'''<div class="details-row">
-                    <span class="label">Est. Revenue:</span>
-                    <span class="value" style="color: #10b981; font-weight: bold;">{amount}</span>
-                </div>''' if amount else ''}
+                    <span class="label">Lead Stage:</span>
+                    <span class="value" style="color: #10b981; font-weight: bold;">{stage}</span>
+                </div>''' if stage else ''}
             </div>
 
             <p style="margin-top: 25px;">You can view and manage all lead status records directly via the Live CRM Dashboard.</p>
@@ -159,7 +159,7 @@ def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline:
 """
     return send_email(to_email, subject, html_content)
 
-def send_followup_reminder(to_email: str, poc_name: str, company: str, followup_date: str, amount: str) -> bool:
+def send_followup_reminder(to_email: str, poc_name: str, company: str, followup_date: str, stage: str) -> bool:
     """Dispatch a professional email reminder for an upcoming lead follow-up date."""
     subject = f"Action Required: Follow-up Scheduled for {company}"
     
@@ -267,9 +267,9 @@ def send_followup_reminder(to_email: str, poc_name: str, company: str, followup_
                     <span class="value" style="color: #0d9488; font-weight: bold;">{followup_date}</span>
                 </div>
                 {f'''<div class="details-row">
-                    <span class="label">Est. Revenue:</span>
-                    <span class="value" style="color: #10b981; font-weight: bold;">{amount}</span>
-                </div>''' if amount else ''}
+                    <span class="label">Lead Stage:</span>
+                    <span class="value" style="color: #10b981; font-weight: bold;">{stage}</span>
+                </div>''' if stage else ''}
             </div>
 
             <p style="margin-top: 25px;">You can view and manage all lead status records directly via the Live CRM Dashboard.</p>

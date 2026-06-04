@@ -114,13 +114,14 @@ def check_and_send_alerts() -> int:
                 continue
                 
             # Send the email alert
+            stage_raw = row.get(stage_header, "") or "Unknown"
             if alert_type == "deadline":
                 success = email_service.send_deadline_reminder(
                     to_email=poc_email,
                     poc_name=poc_name,
                     company=company,
                     deadline=date_val,
-                    amount=amount
+                    stage=stage_raw
                 )
             else:
                 success = email_service.send_followup_reminder(
@@ -128,7 +129,7 @@ def check_and_send_alerts() -> int:
                     poc_name=poc_name,
                     company=company,
                     followup_date=date_val,
-                    amount=amount
+                    stage=stage_raw
                 )
                 
             if success:
