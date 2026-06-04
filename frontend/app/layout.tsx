@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, DM_Mono, Instrument_Serif } from "next/font/google";
+import { Inter, DM_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -35,7 +35,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${dmMono.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${inter.variable} ${dmMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col antialiased transition-colors duration-150">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

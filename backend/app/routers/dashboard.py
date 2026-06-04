@@ -138,3 +138,15 @@ def get_summary(bypass_cache: bool = False):
         "graphs": cfg.get("graphs", []),
     }
 
+
+@router.post("/trigger-reminders")
+def trigger_reminders():
+    """Manual trigger to scan and send deadline email reminders immediately."""
+    from app.services.alert_service import check_and_send_alerts
+    try:
+        sent_count = check_and_send_alerts()
+        return {"status": "success", "sent_count": sent_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+

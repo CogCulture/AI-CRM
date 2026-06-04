@@ -5,12 +5,32 @@ import DashboardShell from "../../components/dashboard/DashboardShell";
 import { User, Bell, Sliders, Shield, Palette } from "lucide-react";
 import { toast } from "sonner";
 
+import { api } from "../../lib/api";
+
 export default function SettingsPage() {
-  const [profile, setProfile] = useState({
-    name: "Arlene Lane",
-    email: "arlene.lane@globex.com",
+  const [profile, setProfile] = React.useState({
+    name: "Loading...",
+    email: "Loading...",
     role: "CRM Administrator",
   });
+
+  React.useEffect(() => {
+    async function loadProfile() {
+      try {
+        const status = await api.getAuthStatus();
+        if (status.authenticated) {
+          setProfile({
+            name: status.name || "Authorized User",
+            email: status.email || "Google Account",
+            role: "CRM Administrator",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load user profile in settings:", err);
+      }
+    }
+    loadProfile();
+  }, []);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();

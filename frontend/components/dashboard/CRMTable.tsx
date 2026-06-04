@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { SlidersHorizontal, ArrowUpDown, Edit3, Trash2 } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, Edit3, Trash2, Search } from "lucide-react";
 import ColumnManager from "./ColumnManager";
 
 interface CRMTableProps {
@@ -11,6 +11,7 @@ interface CRMTableProps {
   columnOrder: string[];
   onSaveConfig: (visible: string[], order: string[]) => Promise<void>;
   searchTerm?: string;
+  onSearchChange?: (val: string) => void;
   onEdit?: (row: Record<string, any>) => void;
   onDelete?: (row: Record<string, any>) => void;
 }
@@ -64,6 +65,7 @@ export default function CRMTable({
   columnOrder,
   onSaveConfig,
   searchTerm,
+  onSearchChange,
   onEdit,
   onDelete,
 }: CRMTableProps) {
@@ -88,11 +90,14 @@ export default function CRMTable({
     : [];
   const [selectedType, setSelectedType] = useState("All");
 
-  const statusColumn = headers.find(h => h.toLowerCase() === "status");
+  const statusColumn = headers.find(h => h.toLowerCase() === "status") || headers.find(h => h.toLowerCase().includes("status")) || "";
   const uniqueStatuses = statusColumn 
     ? Array.from(new Set(rows.map(r => String(r[statusColumn] || "").trim()).filter(Boolean)))
     : [];
   const [selectedStatus, setSelectedStatus] = useState("All");
+
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
   const activeSearch = searchTerm !== undefined ? searchTerm : localSearchTerm;
 
@@ -176,50 +181,136 @@ export default function CRMTable({
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] overflow-hidden shadow-xl transition-colors duration-150">
       {/* Table Action Bar */}
-      <div className="px-5 py-4 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-950 dark:text-white tracking-wide font-sans">
+      <div className="px-5 py-5 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex flex-col items-end gap-3.5">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white font-sans tracking-tight">
           Campaign Performance
         </h3>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 w-full justify-end flex-wrap">
           {/* Type Filter */}
           {typeColumn && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-800 dark:text-white text-xs font-sans rounded-lg transition-colors">
-              <span className="text-gray-500 dark:text-[#888899]">Type:</span>
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="bg-transparent text-gray-900 dark:text-white font-semibold outline-none cursor-pointer pr-1"
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsTypeDropdownOpen(!isTypeDropdownOpen);
+                  setIsStatusDropdownOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#161622] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] text-gray-700 dark:text-white text-xs font-sans rounded-lg transition-colors cursor-pointer"
               >
-                <option value="All" className="bg-white dark:bg-[#161622] text-gray-900 dark:text-white">All</option>
-                {uniqueTypes.map(t => (
-                  <option key={t} value={t} className="bg-white dark:bg-[#161622] text-gray-900 dark:text-white">{t}</option>
-                ))}
-              </select>
+                <span className="text-gray-400 dark:text-[#888899]">Type:</span>
+                <span className="font-medium text-gray-900 dark:text-white">{selectedType}</span>
+                <svg className={`w-3 h-3 text-gray-400 dark:text-[#888899] transition-transform duration-200 ${isTypeDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {isTypeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsTypeDropdownOpen(false)} />
+                  <div className="absolute right-0 mt-1.5 w-40 bg-white dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setSelectedType("All");
+                        setIsTypeDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs font-sans hover:bg-gray-50 dark:hover:bg-[#1C1C2D] transition-colors cursor-pointer ${
+                        selectedType === "All" ? "text-blue-600 dark:text-blue-400 font-semibold bg-gray-50/50 dark:bg-[#1C1C2D]/50" : "text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {uniqueTypes.map(t => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          setSelectedType(t);
+                          setIsTypeDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs font-sans hover:bg-gray-50 dark:hover:bg-[#1C1C2D] transition-colors cursor-pointer ${
+                          selectedType === t ? "text-blue-600 dark:text-blue-400 font-semibold bg-gray-50/50 dark:bg-[#1C1C2D]/50" : "text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {/* Status Filter */}
           {statusColumn && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-800 dark:text-white text-xs font-sans rounded-lg transition-colors">
-              <span className="text-gray-500 dark:text-[#888899]">Status:</span>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="bg-transparent text-gray-900 dark:text-white font-semibold outline-none cursor-pointer pr-1"
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                  setIsTypeDropdownOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#161622] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] text-gray-700 dark:text-white text-xs font-sans rounded-lg transition-colors cursor-pointer"
               >
-                <option value="All" className="bg-white dark:bg-[#161622] text-gray-900 dark:text-white">All</option>
-                {uniqueStatuses.map(s => (
-                  <option key={s} value={s} className="bg-white dark:bg-[#161622] text-gray-900 dark:text-white">{s}</option>
-                ))}
-              </select>
+                <span className="text-gray-400 dark:text-[#888899]">Status:</span>
+                <span className="font-medium text-gray-900 dark:text-white">{selectedStatus}</span>
+                <svg className={`w-3 h-3 text-gray-400 dark:text-[#888899] transition-transform duration-200 ${isStatusDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {isStatusDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsStatusDropdownOpen(false)} />
+                  <div className="absolute right-0 mt-1.5 w-40 bg-white dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setSelectedStatus("All");
+                        setIsStatusDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs font-sans hover:bg-gray-50 dark:hover:bg-[#1C1C2D] transition-colors cursor-pointer ${
+                        selectedStatus === "All" ? "text-blue-600 dark:text-blue-400 font-semibold bg-gray-50/50 dark:bg-[#1C1C2D]/50" : "text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {uniqueStatuses.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => {
+                          setSelectedStatus(s);
+                          setIsStatusDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs font-sans hover:bg-gray-50 dark:hover:bg-[#1C1C2D] transition-colors cursor-pointer ${
+                          selectedStatus === s ? "text-blue-600 dark:text-blue-400 font-semibold bg-gray-50/50 dark:bg-[#1C1C2D]/50" : "text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
+
+          {/* Search bar inside Table */}
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-[#888899]" />
+            <input
+              type="text"
+              placeholder="Search by company or stage..."
+              value={activeSearch}
+              onChange={(e) => {
+                if (onSearchChange) {
+                  onSearchChange(e.target.value);
+                } else {
+                  setLocalSearchTerm(e.target.value);
+                }
+              }}
+              className="w-full pl-9 pr-4 py-1.5 text-xs bg-white dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] hover:border-gray-350 dark:hover:border-[rgba(255,255,255,0.15)] focus:border-blue-500 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555566] transition-all outline-none font-sans"
+            />
+          </div>
 
           {/* Configure Columns Trigger */}
           <button
             onClick={() => setIsManagerOpen(true)}
-            className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 bg-white hover:bg-gray-50 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
             title="Configure Columns"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -231,13 +322,13 @@ export default function CRMTable({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] bg-gray-50/50 dark:bg-[rgba(255,255,255,0.01)] text-[10px] font-sans font-semibold uppercase tracking-wider text-gray-500 dark:text-[#888899]">
+            <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#161622]/40 text-[10px] font-sans font-semibold uppercase tracking-wider text-gray-500 dark:text-[#888899]">
               {activeCols.map((col, idx) => {
                 const isRight = isNumericColumn(col) && col.toLowerCase() !== "no.";
                 return (
                   <th 
                     key={`${col}-${idx}`} 
-                    className={`py-3 px-4 select-none cursor-pointer hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.03)] hover:text-gray-950 dark:hover:text-white transition-colors ${
+                    className={`py-3 px-4 select-none cursor-pointer hover:bg-gray-150/50 dark:hover:bg-[rgba(255,255,255,0.03)] hover:text-gray-950 dark:hover:text-white transition-colors ${
                       isRight ? "text-right" : "text-left"
                     }`}
                     onClick={() => handleSort(col)}
@@ -261,14 +352,14 @@ export default function CRMTable({
               currentRows.map((row, rowIdx) => (
                 <tr 
                   key={rowIdx}
-                  className="border-b border-gray-100 dark:border-[rgba(255,255,255,0.04)] last:border-0 hover:bg-gray-50/40 dark:hover:bg-[rgba(255,255,255,0.02)] transition-colors duration-150 text-xs font-sans text-gray-900 dark:text-gray-100 row-fade-in"
+                  className="border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50/30 dark:hover:bg-[rgba(255,255,255,0.02)] transition-colors duration-150 text-xs font-sans text-gray-900 dark:text-gray-100 row-fade-in"
                   style={{ animationDelay: `${rowIdx * 30}ms` }}
                 >
                   {activeCols.map((col, idx) => {
                     const cellVal = String(row[col] || "");
                     const isNo = col.toLowerCase() === "no.";
                     const isCampaign = col.toLowerCase() === "campaign";
-                    const isValue = col.toLowerCase() === "value";
+                    const isValue = ["value", "amount", "revenue", "estimations", "deal size"].some(x => col.toLowerCase().includes(x));
 
                     if (isCampaign) {
                       const parts = cellVal.split("\n");
@@ -292,9 +383,15 @@ export default function CRMTable({
                     // Render formatted cells
                     const renderCellContent = () => {
                       if (isValue) {
+                        // Apply currency formatting prefix if not already present
+                        const cleanVal = cellVal.replace(/[₹$,\s]/g, "");
+                        const numericVal = parseFloat(cleanVal);
+                        const formatted = !isNaN(numericVal) 
+                          ? `₹${numericVal.toLocaleString("en-IN")}`
+                          : cellVal;
                         return (
-                          <span className="font-semibold text-emerald-600 dark:text-[#3cd395]">
-                            {cellVal}
+                          <span className="font-semibold text-emerald-600 dark:text-[#3cd395] font-mono">
+                            {formatted || "—"}
                           </span>
                         );
                       }
@@ -309,14 +406,24 @@ export default function CRMTable({
                         const valLower = cellVal.toLowerCase().trim();
                         let badgeClass = "bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800/80 dark:text-gray-300 dark:border-gray-700/50";
                         
-                        if (["hot", "won"].some(x => valLower.includes(x))) {
-                          badgeClass = "bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-500/10 dark:text-[#3CD395] dark:border-emerald-500/20";
-                        } else if (["warm", "proposal", "contacted"].some(x => valLower.includes(x))) {
-                          badgeClass = "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20";
-                        } else if (["cold", "negotiation", "sent"].some(x => valLower.includes(x))) {
-                          badgeClass = "bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20";
+                        if (valLower === "hot") {
+                          badgeClass = "bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/50";
+                        } else if (valLower === "warm") {
+                          badgeClass = "bg-red-50 text-red-600 border border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20";
+                        } else if (valLower === "cold") {
+                          badgeClass = "bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20";
+                        } else if (valLower === "lead") {
+                          badgeClass = "bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-850 dark:text-gray-400 dark:border-gray-700/40";
+                        } else if (valLower === "proposal sent" || valLower === "proposal") {
+                          badgeClass = "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-500/10 dark:text-blue-450 dark:border-blue-500/20";
+                        } else if (valLower === "portfolio sent" || valLower === "portfolio") {
+                          badgeClass = "bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-500/10 dark:text-amber-450 dark:border-amber-500/20";
+                        } else if (valLower === "tender lead" || valLower === "tender") {
+                          badgeClass = "bg-yellow-55 text-yellow-800 border border-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-450 dark:border-yellow-500/20";
+                        } else if (["won", "converted", "completed", "success"].some(x => valLower.includes(x))) {
+                          badgeClass = "bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-500/10 dark:text-[#3cd395] dark:border-emerald-500/20";
                         } else if (["dead", "lost"].some(x => valLower.includes(x))) {
-                          badgeClass = "bg-red-50 text-red-700 border border-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20";
+                          badgeClass = "bg-red-50 text-red-700 border border-red-100 dark:bg-red-500/10 dark:text-red-450 dark:border-red-500/20";
                         }
                         return (
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold leading-none ${badgeClass}`}>
@@ -370,7 +477,7 @@ export default function CRMTable({
                         {onEdit && (
                           <button
                             onClick={() => onEdit(row)}
-                            className="p-1 bg-gray-50 hover:bg-gray-150 dark:bg-[rgba(255,255,255,0.03)] dark:hover:bg-[rgba(255,255,255,0.08)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 rounded transition-colors cursor-pointer"
+                            className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 dark:bg-emerald-500/10 dark:border-emerald-500/20 text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 rounded transition-colors cursor-pointer"
                             title="Edit Lead"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -379,7 +486,7 @@ export default function CRMTable({
                         {onDelete && (
                           <button
                             onClick={() => onDelete(row)}
-                            className="p-1 bg-gray-50 hover:bg-gray-150 dark:bg-[rgba(255,255,255,0.03)] dark:hover:bg-[rgba(255,255,255,0.08)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-rose-600 hover:text-rose-500 dark:text-rose-500 dark:hover:text-rose-400 rounded transition-colors cursor-pointer"
+                            className="p-1 bg-red-50 hover:bg-red-100 border border-red-250 dark:bg-red-500/10 dark:border-red-500/20 text-rose-600 hover:text-rose-500 dark:text-rose-450 rounded transition-colors cursor-pointer"
                             title="Delete Lead"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -433,7 +540,7 @@ export default function CRMTable({
             <button
               onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
               disabled={currentPage === 1}
-              className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-250 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-900 dark:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-250 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-900 dark:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px]"
             >
               Prev
             </button>
@@ -459,9 +566,9 @@ export default function CRMTable({
                 <button
                   key={pNum}
                   onClick={() => setCurrentPage(pNum)}
-                  className={`px-2.5 py-1 rounded border text-xs cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded border text-[10px] cursor-pointer transition-colors ${
                     currentPage === pNum
-                      ? "bg-emerald-600 border-emerald-600 text-white font-bold"
+                      ? "bg-[#1E3A8A] border-[#1E3A8A] text-white font-bold"
                       : "bg-gray-100 hover:bg-gray-200 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-800 dark:text-white"
                   }`}
                 >
@@ -473,7 +580,7 @@ export default function CRMTable({
             <button
               onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-250 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-900 dark:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-250 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-900 dark:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px]"
             >
               Next
             </button>

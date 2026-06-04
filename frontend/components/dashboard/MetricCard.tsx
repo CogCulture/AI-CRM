@@ -39,9 +39,9 @@ export default function MetricCard({
       const easeProgress = progress * (2 - progress);
       const current = Math.floor(start + easeProgress * (target - start));
       
-      let formatted = current.toLocaleString();
-      if (prefix === "$" && current >= 1000) {
-        formatted = current.toLocaleString();
+      let formatted = current.toLocaleString("en-IN");
+      if ((prefix === "$" || prefix === "₹") && current >= 1000) {
+        formatted = current.toLocaleString("en-IN");
       }
       
       setDisplayValue(`${prefix}${formatted}${suffix}`);

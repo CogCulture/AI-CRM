@@ -97,8 +97,18 @@ def oauth_callback(code: str, state: str):
         flow.fetch_token(code=code)
         credentials = flow.credentials
         
+        import json as _json
+        creds_data = {
+            "token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_uri": credentials.token_uri,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "scopes": credentials.scopes,
+            "id_token": credentials.id_token
+        }
         with open(_get_token_path(), "w") as f:
-            f.write(credentials.to_json())
+            _json.dump(creds_data, f)
             
         frontend_url = state if state else "http://localhost:3001/admin"
         separator = "&" if "?" in frontend_url else "?"
@@ -128,28 +138,51 @@ def auth_status():
         from google.oauth2.credentials import Credentials
         creds = Credentials.from_authorized_user_file(token_path)
         
+        # If expired, attempt refresh
+        if creds.expired and creds.refresh_token:
+            try:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                with open(token_path, "w") as f:
+                    f.write(creds.to_json())
+            except Exception:
+                pass
+
+        import httpx
+        # Call userinfo endpoint using access token
+        headers = {"Authorization": f"Bearer {creds.token}"}
+        res = httpx.get("https://www.googleapis.com/oauth2/v3/userinfo", headers=headers)
+        if res.status_code == 200:
+            user_data = res.json()
+            return {
+                "authenticated": True,
+                "email": user_data.get("email", ""),
+                "name": user_data.get("name", ""),
+                "picture": user_data.get("picture", "")
+            }
+
+        # Fallback to id_token if API request fails
         import base64
         import json as _json
         account_info = {}
-        if creds.token:
-            with open(token_path, "r") as f:
-                raw = _json.load(f)
-            id_token = raw.get("id_token", "")
-            if id_token:
-                try:
-                    payload_b64 = id_token.split(".")[1]
-                    payload_b64 += "=" * (4 - len(payload_b64) % 4)
-                    payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
-                    account_info = {
-                        "email": payload.get("email", ""),
-                        "name": payload.get("name", ""),
-                        "picture": payload.get("picture", "")
-                    }
-                except Exception:
-                    pass
+        with open(token_path, "r") as f:
+            raw = _json.load(f)
+        id_token = raw.get("id_token", "")
+        if id_token:
+            try:
+                payload_b64 = id_token.split(".")[1]
+                payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+                account_info = {
+                    "email": payload.get("email", ""),
+                    "name": payload.get("name", ""),
+                    "picture": payload.get("picture", "")
+                }
+            except Exception:
+                pass
 
         return {
-            "authenticated": True, 
+            "authenticated": True,
             "expired": creds.expired,
             **account_info
         }

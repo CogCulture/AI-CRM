@@ -22,6 +22,14 @@ interface GraphWidgetProps {
 
 const COLORS = ["#86F3D4", "#38BDF8", "#4E60A6", "#548CA8", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6"];
 
+const getSegmentColor = (name: string, index: number): string => {
+  const norm = name.toLowerCase().trim();
+  if (norm === "cold") return "#93C5FD"; // light blue
+  if (norm === "warm") return "#FCA5A5"; // light red
+  if (norm === "hot") return "#DC2626"; // dark red
+  return COLORS[index % COLORS.length];
+};
+
 const MOCK_LINE_DATA = [
   { name: "May", Deals: 5.0, Revenue: 480 },
   { name: "Jun", Deals: 4.2, Revenue: 400 },
@@ -45,7 +53,7 @@ const CustomTooltip = ({ active, payload }: any) => {
         <p className="text-[#888899] mb-1 font-mono">{payload[0].payload.name}</p>
         <div className="space-y-1 font-mono">
           <p className="text-[#38BDF8] font-semibold">Deals: {payload[0].value}</p>
-          <p className="text-[#86F3D4] font-semibold">Revenue: ${payload[1].value}</p>
+          <p className="text-[#86F3D4] font-semibold">Revenue: ₹{payload[1].value.toLocaleString("en-IN")}</p>
         </div>
       </div>
     );
@@ -79,7 +87,7 @@ const RenderCustomizedLabel = (props: any) => {
         textAnchor="middle"
         fontFamily="sans-serif"
       >
-        $560
+        ₹560
       </text>
       {/* Glowing point at intersection */}
       <circle cx={cx} cy={cy} r={5} fill="#10B981" stroke="#0A0A0F" strokeWidth={1.5} />
@@ -184,7 +192,7 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
 
     let rawData = Object.keys(sums).map((key) => ({
       name: key,
-      value: Number(sums[key].toFixed(2)),
+      value: graph.type === "pie" ? counts[key] : Number(sums[key].toFixed(2)),
       count: counts[key],
     }));
 
@@ -238,79 +246,77 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
                      graph.y_col.toLowerCase().includes("amount") || 
                      graph.y_col.toLowerCase().includes("revenue");
   const formattedTotal = isCurrency
-    ? `$${totalSum.toLocaleString()}`
-    : totalSum.toLocaleString();
+    ? `₹${totalSum.toLocaleString("en-IN")}`
+    : totalSum.toLocaleString("en-IN");
 
   const renderChart = () => {
     if (isMock) {
       if (graph.type === "line" || graph.id === "default-line") {
         return (
-          <LineChart data={MOCK_LINE_DATA} margin={{ top: 15, right: 0, left: -25, bottom: 0 }}>
-            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
-            
-            <YAxis 
-              yAxisId="left"
-              stroke="currentColor"
-              strokeOpacity={0.1}
-              tickLine={false} 
-              axisLine={false}
-              domain={[2, 8]}
-              ticks={[2, 4, 6, 8]}
-              tick={{ fontSize: 10, fill: "#888899" }} 
-            />
-            <YAxis 
-              yAxisId="right"
-              orientation="right"
-              stroke="currentColor"
-              strokeOpacity={0.1}
-              tickLine={false} 
-              axisLine={false}
-              domain={[200, 1000]}
-              ticks={[200, 400, 600, 800, 1000]}
-              tickFormatter={(v) => `$${v}`}
-              tick={{ fontSize: 10, fill: "#888899" }} 
-            />
-            
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "currentColor", strokeOpacity: 0.08, strokeWidth: 1 }} />
-            
-            <Line yAxisId="left" type="monotone" dataKey="Deals" stroke="#185FA5" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#185FA5" }} />
-            <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#1D9E75" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#1D9E75" }} />
-            
-            <ReferenceDot yAxisId="right" x="Aug" y={560} shape={RenderCustomizedLabel} />
-          </LineChart>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={MOCK_LINE_DATA} margin={{ top: 15, right: 0, left: -25, bottom: 0 }}>
+              <CartesianGrid stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+              <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
+              
+              <YAxis 
+                yAxisId="left"
+                stroke="currentColor"
+                strokeOpacity={0.1}
+                tickLine={false} 
+                axisLine={false}
+                domain={[2, 8]}
+                ticks={[2, 4, 6, 8]}
+                tick={{ fontSize: 10, fill: "#888899" }} 
+              />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                stroke="currentColor"
+                strokeOpacity={0.1}
+                tickLine={false} 
+                axisLine={false}
+                domain={[200, 1000]}
+                ticks={[200, 400, 600, 800, 1000]}
+                tickFormatter={(v) => `₹${v}`}
+                tick={{ fontSize: 10, fill: "#888899" }} 
+              />
+              
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "currentColor", strokeOpacity: 0.08, strokeWidth: 1 }} />
+              
+              <Line yAxisId="left" type="monotone" dataKey="Deals" stroke="#185FA5" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#185FA5" }} />
+              <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#1D9E75" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#1D9E75" }} />
+              
+              <ReferenceDot yAxisId="right" x="Aug" y={560} shape={RenderCustomizedLabel} />
+            </LineChart>
+          </ResponsiveContainer>
         );
       }
 
       if (graph.type === "pie" || graph.id === "default-pie") {
         return (
           <div className="relative w-full h-full">
-            {/* Absolute Total Center text */}
-            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-              <span className="text-[10px] text-[#555566] font-sans font-medium uppercase tracking-wider block">Total</span>
-              <span className="text-xl font-bold text-gray-900 dark:text-white font-sans mt-0.5">$4,271.57</span>
-            </div>
-            
-            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <SafePie
-                data={MOCK_PIE_DATA}
-                cx="50%"
-                cy="40%"
-                innerRadius={58}
-                outerRadius={73}
-                paddingAngle={3}
-                dataKey="value"
-                activeIndex={0}
-                activeShape={renderActiveShape}
-                cornerRadius={6}
-                stroke="none"
-              >
-                {MOCK_PIE_DATA.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </SafePie>
-              <Tooltip formatter={(v) => `$${Number(v).toLocaleString()}`} contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
-            </PieChart>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <SafePie
+                  data={MOCK_PIE_DATA}
+                  cx="50%"
+                  cy="40%"
+                  innerRadius={58}
+                  outerRadius={73}
+                  paddingAngle={3}
+                  dataKey="value"
+                  activeIndex={0}
+                  activeShape={renderActiveShape}
+                  cornerRadius={6}
+                  stroke="none"
+                >
+                  {MOCK_PIE_DATA.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </SafePie>
+                <Tooltip formatter={(v) => `${Number(v).toLocaleString("en-IN")} leads`} contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         );
       }
@@ -327,80 +333,83 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
     switch (graph.type) {
       case "line":
         return (
-          <LineChart data={chartData} margin={{ top: 15, right: 10, left: -25, bottom: 0 }}>
-            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
-            <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
-            <Tooltip contentStyle={{ background: "#12121A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
-            <Line type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#1D9E75" }} />
-          </LineChart>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 15, right: 10, left: -25, bottom: 0 }}>
+              <CartesianGrid stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+              <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
+              <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#888899" }} />
+              <Tooltip contentStyle={{ background: "#12121A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
+              <Line type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#1D9E75" }} />
+            </LineChart>
+          </ResponsiveContainer>
         );
       case "area":
         return (
-          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-            <defs>
-              <linearGradient id={`grad-${graph.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#1D9E75" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#1D9E75" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
-            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
-            <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
-            <Tooltip contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "monospace", fontSize: 10 }} />
-            <Area type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} fillOpacity={1} fill={`url(#grad-${graph.id})`} />
-          </AreaChart>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${graph.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#1D9E75" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#1D9E75" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
+              <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+              <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+              <Tooltip contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "monospace", fontSize: 10 }} />
+              <Area type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} fillOpacity={1} fill={`url(#grad-${graph.id})`} />
+            </AreaChart>
+          </ResponsiveContainer>
         );
       case "pie":
         return (
           <div className="relative w-full h-full">
-            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-              <span className="text-[10px] text-[#555566] font-sans font-medium uppercase tracking-wider block">Total</span>
-              <span className="text-xl font-bold text-gray-900 dark:text-white font-sans mt-0.5">{formattedTotal}</span>
-            </div>
-            
-            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <SafePie
-                data={chartData}
-                cx="50%"
-                cy="40%"
-                innerRadius={58}
-                outerRadius={73}
-                paddingAngle={3}
-                dataKey="value"
-                activeIndex={0}
-                activeShape={renderActiveShape}
-                cornerRadius={6}
-                stroke="none"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </SafePie>
-              <Tooltip formatter={(v) => isCurrency ? `$${Number(v).toLocaleString()}` : Number(v).toLocaleString()} contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
-            </PieChart>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <SafePie
+                  data={chartData}
+                  cx="50%"
+                  cy="40%"
+                  innerRadius={58}
+                  outerRadius={73}
+                  paddingAngle={3}
+                  dataKey="value"
+                  activeIndex={0}
+                  activeShape={renderActiveShape}
+                  cornerRadius={6}
+                  stroke="none"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={getSegmentColor(entry.name, index)} />
+                  ))}
+                </SafePie>
+                <Tooltip formatter={(v) => `${Number(v).toLocaleString("en-IN")} leads`} contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "sans-serif", fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         );
       case "bar":
       default:
         return (
-          <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-            <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
-            <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
-            <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
-            <Tooltip contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "monospace", fontSize: 10 }} />
-            <Bar dataKey="value" fill="#1D9E75" radius={[3, 3, 0, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Bar>
-          </BarChart>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" />
+              <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+              <YAxis stroke="currentColor" strokeOpacity={0.1} tickLine={false} tick={{ fontSize: 9, fontFamily: "monospace" }} />
+              <Tooltip contentStyle={{ background: "#0C0C12", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#F1F1F5", fontFamily: "monospace", fontSize: 10 }} />
+              <Bar dataKey="value" fill="#1D9E75" radius={[3, 3, 0, 0]}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         );
     }
   };
 
   return (
-    <div className="rounded-2xl p-5 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] flex flex-col justify-between relative group shadow-lg min-w-0 w-full transition-colors duration-150">
+    <div className="rounded-2xl p-5 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] flex flex-col justify-between relative group shadow-lg min-w-0 w-full h-full transition-colors duration-150">
       {/* Header */}
       <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2">
@@ -436,12 +445,8 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
       </div>
 
       {/* Body */}
-      <div className="w-full min-w-0" style={{ height: `${height}px` }}>
-        {mounted && (
-          <ResponsiveContainer width="100%" height="100%">
-            {renderChart()}
-          </ResponsiveContainer>
-        )}
+      <div className="w-full min-w-0 relative flex-1" style={{ minHeight: `${height}px` }}>
+        {mounted && renderChart()}
       </div>
 
       {/* Footer / Custom Mock Legend info */}
@@ -468,8 +473,8 @@ export default function GraphWidget({ graph, rows, onDelete, height = 220, isMoc
         <div className="flex items-center justify-center gap-4 text-[10px] font-mono mt-3.5 flex-wrap">
           {chartData.map((entry, index) => (
             <div key={entry.name} className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-              <span className="text-[#888899]">{entry.name}</span>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSegmentColor(entry.name, index) }} />
+              <span className="text-[#888899]">{entry.name} ({entry.count})</span>
             </div>
           ))}
         </div>

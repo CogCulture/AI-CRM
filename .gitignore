@@ -12,3 +12,8 @@ client_secret_*.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Databases & local caches
+backend/*.db
+scratch_api_data.json
+backend/scratch/

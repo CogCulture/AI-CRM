@@ -1,8 +1,6 @@
-"use client";
-
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   TrendingUp, 
@@ -11,24 +9,99 @@ import {
   Database, 
   Settings, 
   HelpCircle, 
-  MoreVertical 
+  LogOut 
 } from "lucide-react";
 import { ThemeToggle } from "../ThemeToggle";
+import { api } from "../../lib/api";
 
 interface DashboardShellProps {
   children: React.ReactNode;
 }
 
+// Check if email domain is a public/personal email provider
+function isWorkEmail(email: string): boolean {
+  if (!email) return false;
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return false;
+  const publicDomains = [
+    "gmail.com",
+    "yahoo.com",
+    "hotmail.com",
+    "outlook.com",
+    "live.com",
+    "aol.com",
+    "icloud.com",
+    "mail.com",
+    "gmx.com",
+    "yandex.com"
+  ];
+  return !publicDomains.includes(domain);
+}
+
 export default function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<{ name: string; email: string; picture: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const status = await api.getAuthStatus();
+        if (!status.authenticated) {
+          router.replace("/login");
+        } else if (status.email && !isWorkEmail(status.email)) {
+          await api.signOut();
+          router.replace("/login?error=work_email_required");
+        } else {
+          setUser({
+            name: status.name || "Authorized User",
+            email: status.email || "Google Account",
+            picture: status.picture || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80"
+          });
+        }
+      } catch (err) {
+        router.replace("/login");
+      } finally {
+        setLoading(false);
+      }
+    }
+    checkAuth();
+  }, [router]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Revenue Analytics", href: "/dashboard?tab=revenue", icon: TrendingUp },
-    { name: "Journeys", href: "/dashboard?tab=journeys", icon: Compass },
-    { name: "Performance", href: "/dashboard?tab=performance", icon: BarChart2 },
     { name: "Data Platform", href: "/dashboard?tab=data", icon: Database },
   ];
+
+  const handleSignOut = async () => {
+    try {
+      await api.signOut();
+      router.replace("/login");
+    } catch (err) {
+      router.replace("/login");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#0A0A0F] text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative flex h-10 w-10">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-10 w-10 bg-emerald-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" strokeDasharray="3 3" />
+                <circle cx="12" cy="12" r="2" fill="currentColor" />
+              </svg>
+            </span>
+          </div>
+          <span className="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Verifying Workspace...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-[#0A0A0F] font-sans transition-colors duration-150">
@@ -101,17 +174,21 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         <div className="p-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.06)] flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
             <img 
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80" 
-              alt="Arlene Lane" 
+              src={user?.picture} 
+              alt={user?.name} 
               className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-[rgba(255,255,255,0.1)]"
             />
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-900 dark:text-white truncate leading-tight">Arlene Lane</p>
-              <p className="text-[10px] text-gray-400 dark:text-[#555566] truncate font-mono mt-0.5">globex.com</p>
+              <p className="text-xs font-semibold text-gray-900 dark:text-white truncate leading-tight">{user?.name}</p>
+              <p className="text-[10px] text-gray-400 dark:text-[#555566] truncate font-mono mt-0.5">{user?.email}</p>
             </div>
           </div>
-          <button className="p-1 rounded text-gray-400 dark:text-[#555566] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer">
-            <MoreVertical className="w-4 h-4" />
+          <button 
+            onClick={handleSignOut}
+            className="p-1 rounded text-gray-400 dark:text-[#555566] hover:text-red-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </aside>

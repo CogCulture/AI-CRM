@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     config_store_path: str = os.path.join(base_dir, "config_store.json")
     cors_origins: List[str] = ["http://localhost:3000"]
     cache_ttl_seconds: int = 60
+    
+    # SMTP Settings
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = "aryan@cogculture.agency"
+    smtp_password: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
