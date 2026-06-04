@@ -78,6 +78,9 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
   let wonRevenue = 0;
   let lostRevenue = 0;
   let totalEstimatedRevenue = 0;
+  let hotRevenue = 0;
+  let warmRevenue = 0;
+  let coldRevenue = 0;
   const monthlyDataMap: Record<string, { won: number; lost: number }> = {};
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -98,6 +101,18 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
         wonRevenue += revVal;
       } else if (isLost) {
         lostRevenue += revVal;
+      }
+
+      // Classify hot, warm, cold
+      const isHot = statusVal === "hot" || isWon;
+      const isCold = statusVal === "cold" || statusVal === "dead lead" || statusVal === "dead" || isLost;
+
+      if (isHot) {
+        hotRevenue += revVal;
+      } else if (isCold) {
+        coldRevenue += revVal;
+      } else {
+        warmRevenue += revVal;
       }
 
       // Group by month for chart representation
@@ -129,32 +144,14 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
     });
   }
 
-  // Formatting chart data
-  let chartData = MOCK_REVENUE_DATA;
-  if (!isMock && Object.keys(monthlyDataMap).length > 0) {
-    chartData = Object.keys(monthlyDataMap)
-      .map(month => ({
-        name: month,
-        "Won Revenue": monthlyDataMap[month].won,
-        "Lost Revenue": monthlyDataMap[month].lost,
-      }))
-      .sort((a, b) => MONTHS.indexOf(a.name) - MONTHS.indexOf(b.name));
-  } else if (!isMock) {
-    // If no monthly groupings found, aggregate by campaign or fallback
-    wonRevenue = wonRevenue || 0;
-    lostRevenue = lostRevenue || 0;
-    chartData = [
-      { name: "Current Period", "Won Revenue": wonRevenue, "Lost Revenue": lostRevenue }
-    ];
-  } else {
-    // Mock totals
+  // Set totals for mock data
+  if (isMock) {
     wonRevenue = MOCK_REVENUE_DATA.reduce((acc, curr) => acc + curr["Won Revenue"], 0);
     lostRevenue = MOCK_REVENUE_DATA.reduce((acc, curr) => acc + curr["Lost Revenue"], 0);
-  }
-
-  // Set total estimated revenue for mock data
-  if (isMock) {
-    totalEstimatedRevenue = wonRevenue + lostRevenue + 150000; // Mock total estimate including active leads
+    totalEstimatedRevenue = wonRevenue + lostRevenue + 150000;
+    hotRevenue = wonRevenue + 50000;
+    coldRevenue = lostRevenue + 30000;
+    warmRevenue = totalEstimatedRevenue - hotRevenue - coldRevenue;
   }
 
   const formatCurrency = (val: number) => {
@@ -215,44 +212,79 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
         </div>
       </div>
 
-      {/* Right side: Dual Bar Chart */}
-      <div className="flex-1 min-w-0 h-64 md:h-auto relative flex flex-col">
-        <div className="flex-1">
-          {mounted && (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid stroke="currentColor" strokeOpacity={0.06} strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="currentColor" 
-                  strokeOpacity={0.1} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: "#888899" }} 
-                />
-                <YAxis 
-                  stroke="currentColor" 
-                  strokeOpacity={0.1} 
-                  tickLine={false} 
-                  tickFormatter={(v) => `₹${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`}
-                  tick={{ fontSize: 10, fill: "#888899" }} 
-                />
-                <Tooltip content={<CustomRevenueTooltip />} />
-                <Bar dataKey="Won Revenue" fill={COLORS.won} radius={[4, 4, 0, 0]} maxBarSize={32} />
-                <Bar dataKey="Lost Revenue" fill={COLORS.lost} radius={[4, 4, 0, 0]} maxBarSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-        
-        {/* Custom Legend to match mockup */}
-        <div className="flex items-center justify-center gap-6 text-[11px] font-sans font-medium text-gray-700 dark:text-[#888899] mt-3">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded bg-[#1D9E75]" />
-            <span>Won Revenue</span>
+      {/* Right side: Numerical breakdown of Hot, Warm, Cold */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <h4 className="text-[11px] font-semibold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-sans mb-3.5">
+          Revenue Breakdown by Lead Temp
+        </h4>
+        <div className="flex flex-col gap-3">
+          {/* Hot leads row */}
+          <div className="p-3 rounded-xl border border-red-150/50 dark:border-red-500/10 bg-red-50/20 dark:bg-red-500/5 flex flex-col gap-1.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Hot Leads</span>
+              </div>
+              <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                {formatCurrency(hotRevenue)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-red-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${totalEstimatedRevenue > 0 ? (hotRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
+              <span>Share of pipeline</span>
+              <span>{totalEstimatedRevenue > 0 ? ((hotRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded bg-[#EF4444]" />
-            <span>Lost Revenue</span>
+
+          {/* Warm leads row */}
+          <div className="p-3 rounded-xl border border-amber-150/50 dark:border-amber-500/10 bg-amber-50/20 dark:bg-amber-500/5 flex flex-col gap-1.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Warm Leads</span>
+              </div>
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                {formatCurrency(warmRevenue)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-amber-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${totalEstimatedRevenue > 0 ? (warmRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
+              <span>Share of pipeline</span>
+              <span>{totalEstimatedRevenue > 0 ? ((warmRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+            </div>
+          </div>
+
+          {/* Cold leads row */}
+          <div className="p-3 rounded-xl border border-blue-150/50 dark:border-blue-500/10 bg-blue-50/20 dark:bg-blue-500/5 flex flex-col gap-1.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Cold Leads</span>
+              </div>
+              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                {formatCurrency(coldRevenue)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-blue-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${totalEstimatedRevenue > 0 ? (coldRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
+              <span>Share of pipeline</span>
+              <span>{totalEstimatedRevenue > 0 ? ((coldRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+            </div>
           </div>
         </div>
       </div>
