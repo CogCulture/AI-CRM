@@ -55,7 +55,7 @@ def oauth_auth(redirect_url: str = "http://localhost:3001/admin"):
             "email",
             "profile"
         ],
-        redirect_uri="http://localhost:8000/api/sheets/callback"
+        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/sheets/callback")
     )
     
     authorization_url, state = flow.authorization_url(
@@ -90,7 +90,7 @@ def oauth_callback(code: str, state: str):
             "email",
             "profile"
         ],
-        redirect_uri="http://localhost:8000/api/sheets/callback"
+        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/sheets/callback")
     )
     
     try:
