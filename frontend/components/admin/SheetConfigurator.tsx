@@ -188,13 +188,13 @@ export default function SheetConfigurator() {
     <div className="space-y-8 max-w-3xl mx-auto animate-row-reveal">
       {/* Title */}
       <div>
-        <h1 className="font-display text-4xl text-white font-medium tracking-wide">Sync Configuration</h1>
-        <p className="text-xs text-[#888899] font-mono mt-1">Configure live sync endpoint from Google Sheets API v4</p>
+        <h1 className="font-display text-4xl text-gray-900 dark:text-white font-medium tracking-wide">Sync Configuration</h1>
+        <p className="text-xs text-gray-500 dark:text-[#888899] font-mono mt-1">Configure live sync endpoint from Google Sheets API v4</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         {/* Connection Status Banner */}
-        <div className={`obsidian-glass rounded-xl p-5 border ${
+        <div className={`rounded-xl p-5 border transition-all duration-300 ${
           config.sheet_url && config.sheet_url !== "mock"
             ? "border-green-500/20 bg-green-500/5 shadow-[0_0_15px_rgba(16,185,129,0.02)]"
             : "border-amber-500/20 bg-amber-500/5 shadow-[0_0_15px_rgba(245,158,11,0.02)]"
@@ -206,12 +206,12 @@ export default function SheetConfigurator() {
               <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white">
+              <p className="text-xs font-semibold text-gray-800 dark:text-white">
                 {config.sheet_url && config.sheet_url !== "mock"
                   ? "Live Workspace Connected"
                   : "Not Connected — Playground Mode Active"}
               </p>
-              <p className="text-[10px] text-[#888899] font-mono mt-0.5 truncate">
+              <p className="text-[10px] text-gray-500 dark:text-[#888899] font-mono mt-0.5 truncate">
                 {config.sheet_url && config.sheet_url !== "mock"
                   ? `URL: ${config.sheet_url} (Tab: ${config.sheet_range || "Sheet1"})`
                   : "Running on local Mock CRM campaign data. Enter a sheet URL below to connect."}
@@ -221,7 +221,7 @@ export default function SheetConfigurator() {
         </div>
 
         {/* Google Account Connection Card */}
-        <div className="obsidian-glass rounded-xl p-6 border border-[rgba(255,255,255,0.06)] bg-[#0C0C12]/20 shadow-xl space-y-4">
+        <div className="bg-white/80 dark:bg-[#0C0C12]/20 rounded-xl p-6 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* Correct Google Sheets Logo */}
@@ -233,9 +233,9 @@ export default function SheetConfigurator() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white tracking-wide">Google Account Authentication</h3>
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-white tracking-wide">Google Account Authentication</h3>
                 {authStatus.loading ? (
-                  <p className="text-xs text-[#888899]">Checking authentication status...</p>
+                  <p className="text-xs text-gray-500 dark:text-[#888899]">Checking authentication status...</p>
                 ) : authStatus.authenticated ? (
                   <div className="flex items-center gap-2 mt-1">
                     {authStatus.picture && (
@@ -246,12 +246,12 @@ export default function SheetConfigurator() {
                       />
                     )}
                     <div>
-                      <p className="text-xs font-semibold text-white">{authStatus.name || "Google Account"}</p>
-                      <p className="text-[10px] text-[#888899] font-mono">{authStatus.email || "Connected"}</p>
+                      <p className="text-xs font-semibold text-gray-800 dark:text-white">{authStatus.name || "Google Account"}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-[#888899] font-mono">{authStatus.email || "Connected"}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-[#888899]">Connect your Google account to access private sheets securely.</p>
+                  <p className="text-xs text-gray-500 dark:text-[#888899]">Connect your Google account to access private sheets securely.</p>
                 )}
               </div>
             </div>
@@ -285,43 +285,41 @@ export default function SheetConfigurator() {
               </button>
             </div>
           )}
-        </div>
-
-        {/* Sync Settings Card */}
-        <div className="obsidian-glass rounded-xl p-6 border border-[rgba(255,255,255,0.06)] bg-[#0C0C12]/20 shadow-xl space-y-6">
+        </div>        {/* Sync Settings Card */}
+        <div className="bg-white/80 dark:bg-[#0C0C12]/20 rounded-xl p-6 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] shadow-xl space-y-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-wide">Sheets Connection</h3>
-              <p className="text-xs text-[#888899]">Paste Google Sheet URL and define target Range tab name</p>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-white tracking-wide">Sheets Connection</h3>
+              <p className="text-xs text-gray-500 dark:text-[#888899]">Paste Google Sheet URL and define target Range tab name</p>
             </div>
           </div>
-
+ 
           <form onSubmit={handleSave} className="space-y-4">
             {/* Sheet URL Input */}
             <div className="space-y-1.5">
-              <label className="text-xs font-mono uppercase tracking-wider text-[#888899]">Google Sheet URL</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Google Sheet URL</label>
               <input
                 type="text"
                 placeholder="https://docs.google.com/spreadsheets/d/.../edit"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
+                className="w-full px-4 py-2.5 text-sm bg-gray-55 dark:bg-[rgba(255,255,255,0.02)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-800 dark:text-white font-mono placeholder-gray-400 dark:placeholder-[#555566] transition-all outline-none"
               />
             </div>
-
+ 
             <div className="grid grid-cols-2 gap-4">
               {/* Range Input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-mono uppercase tracking-wider text-[#888899]">Sheet Range Tab</label>
+                <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Sheet Range Tab</label>
                 <input
                   type="text"
                   placeholder="Sheet1"
                   value={rangeInput}
                   onChange={(e) => setRangeInput(e.target.value)}
-                  className="w-full px-4 py-2 text-sm bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-white font-mono placeholder-[#555566] transition-all outline-none"
+                  className="w-full px-4 py-2 text-sm bg-gray-55 dark:bg-[rgba(255,255,255,0.02)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-800 dark:text-white font-mono placeholder-gray-400 dark:placeholder-[#555566] transition-all outline-none"
                 />
               </div>
 
@@ -331,7 +329,7 @@ export default function SheetConfigurator() {
                   type="button"
                   onClick={handleTest}
                   disabled={testing}
-                  className="flex-1 py-2 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.06)] text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[rgba(255,255,255,0.03)] dark:hover:bg-[rgba(255,255,255,0.08)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-800 dark:text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   {testing ? (
                     <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
@@ -356,11 +354,9 @@ export default function SheetConfigurator() {
               </div>
             </div>
           </form>
-        </div>
-
-        {/* Test Result Indicator Card */}
+        </div>        {/* Test Result Indicator Card */}
         {testResult && testResult.tested && (
-          <div className={`obsidian-glass rounded-xl p-6 border transition-all duration-300 ${
+          <div className={`rounded-xl p-6 border transition-all duration-300 ${
             testResult.success 
               ? "border-green-500/20 bg-green-500/5 shadow-[0_0_20px_rgba(16,185,129,0.03)]" 
               : "border-red-500/20 bg-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.03)]"
@@ -371,29 +367,29 @@ export default function SheetConfigurator() {
               ) : (
                 <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
               )}
-
+ 
               <div className="space-y-3 flex-1">
                 <div>
-                  <h4 className="text-sm font-semibold text-white tracking-wide">
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-white tracking-wide">
                     {testResult.success 
                       ? testResult.is_mock 
                         ? "Mock database fallback active" 
                         : "Google Sheet connection successful" 
                       : "Sync Connection Failed"}
                   </h4>
-                  <p className="text-xs text-[#888899] mt-1">
+                  <p className="text-xs text-gray-500 dark:text-[#888899] mt-1">
                     {testResult.success 
                       ? `Found ${testResult.row_count} records with ${testResult.headers.length} properties inside tab range "${rangeInput}".`
                       : testResult.message || "Failed to fetch values. Confirm Sheet URL, sharing permissions, and API key configurations."}
                   </p>
                 </div>
-
+ 
                 {testResult.success && testResult.headers.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-[rgba(255,255,255,0.06)]">
-                    <label className="text-[10px] font-mono uppercase tracking-wider text-[#555566]">Detected Columns</label>
+                  <div className="space-y-1.5 pt-2 border-t border-gray-200 dark:border-[rgba(255,255,255,0.06)]">
+                    <label className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#555566]">Detected Columns</label>
                     <div className="flex flex-wrap gap-1.5">
                       {testResult.headers.map((h, idx) => (
-                        <span key={`${h}-${idx}`} className="px-2 py-0.5 text-[10px] font-mono bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] text-[#dedee5] rounded">
+                        <span key={`${h}-${idx}`} className="px-2 py-0.5 text-[10px] font-mono bg-gray-150 dark:bg-[rgba(255,255,255,0.04)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] text-gray-700 dark:text-[#dedee5] rounded">
                           {h}
                         </span>
                       ))}
