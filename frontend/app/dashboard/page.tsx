@@ -376,7 +376,7 @@ function DashboardContent() {
       }
 
       stgVals.forEach(stg => {
-        if (["won", "closed won", "converted", "completed", "hired", "success", "lost", "dead", "lost lead", "dead lead"].some(x => stg.includes(x))) {
+        if (["won", "closed won", "converted", "completed", "hired", "success", "lost", "dead", "lost lead", "dead lead", "cold"].some(x => stg.includes(x))) {
           isWonOrLost = true;
         }
       });

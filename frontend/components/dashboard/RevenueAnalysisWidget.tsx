@@ -92,7 +92,7 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
       const stageVal = String(row[stageHeader] || "").toLowerCase().trim();
 
       const isWon = ["won", "closed won", "converted", "completed", "hired", "success"].some(x => statusVal.includes(x) || stageVal.includes(x));
-      const isLost = ["lost", "dead", "lost lead", "dead lead"].some(x => statusVal.includes(x) || stageVal.includes(x));
+      const isLost = ["lost", "dead", "lost lead", "dead lead", "cold"].some(x => statusVal.includes(x) || stageVal.includes(x));
 
       if (isWon) {
         wonRevenue += revVal;
