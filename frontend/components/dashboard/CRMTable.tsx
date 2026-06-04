@@ -110,16 +110,15 @@ export default function CRMTable({
   const displayCols = columnOrder.length > 0 ? columnOrder : [...headers];
   const activeCols = displayCols.filter((col) => {
     if (visibleColumns.length === 0) return headers.includes(col);
-    return visibleColumns.includes(col) && headers.includes(col);
+    // Show if it's explicitly visible, or if it's a new column not yet present in columnOrder config
+    return (visibleColumns.includes(col) || (headers.includes(col) && !columnOrder.includes(col))) && headers.includes(col);
   });
 
   // Include missing headers that aren't in columnOrder yet
   headers.forEach((h) => {
     if (!displayCols.includes(h)) {
       displayCols.push(h);
-      if (visibleColumns.length === 0 || visibleColumns.includes(h)) {
-        activeCols.push(h);
-      }
+      activeCols.push(h); // Make it visible by default since it is brand new
     }
   });
 

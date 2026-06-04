@@ -32,9 +32,16 @@ export default function ColumnManager({
   });
 
   const [order, setOrder] = useState<string[]>([...currentOrder]);
-  const [visible, setVisible] = useState<string[]>(
-    visibleColumns.length > 0 ? [...visibleColumns] : [...allHeaders]
-  );
+  const [visible, setVisible] = useState<string[]>(() => {
+    if (visibleColumns.length === 0) return [...allHeaders];
+    const initialVisible = [...visibleColumns];
+    allHeaders.forEach(h => {
+      if (!visibleColumns.includes(h) && !columnOrder.includes(h) && !initialVisible.includes(h)) {
+        initialVisible.push(h);
+      }
+    });
+    return initialVisible;
+  });
   const [saving, setSaving] = useState(false);
 
   if (!isOpen) return null;
