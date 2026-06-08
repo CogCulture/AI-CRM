@@ -28,6 +28,7 @@ export const api = {
     }),
   getAuthStatus: () => apiFetch<{
     authenticated: boolean;
+    id?: string;
     expired?: boolean;
     email?: string;
     name?: string;

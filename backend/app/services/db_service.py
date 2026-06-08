@@ -16,9 +16,6 @@ def is_supabase_enabled() -> bool:
 
 def init_db():
     """Initialize local SQLite DB if active."""
-    if is_supabase_enabled():
-        return # Handled in Supabase dashboard SQL schema setup
-        
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -34,6 +31,15 @@ def init_db():
             data TEXT,
             created_at TEXT,
             updated_at TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE,
+            name TEXT,
+            picture TEXT,
+            last_login TEXT
         )
     """)
     conn.commit()
@@ -118,3 +124,100 @@ def mark_reminder_sent(company: str, deadline: str):
         print(f"Failed to record reminder sent status locally: {e}")
     finally:
         conn.close()
+
+def upsert_user(email: str, name: str, picture: str) -> str:
+    """Upsert user information in database and return user's UUID."""
+    import uuid
+    if not email:
+        return ""
+    
+    email_clean = email.strip().lower()
+    now_str = datetime.utcnow().isoformat()
+    
+    # Check if user already exists
+    user_id = None
+    
+    if is_supabase_enabled():
+        url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/users"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        params = {
+            "email": f"eq.{email_clean}",
+            "select": "id"
+        }
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                res = client.get(url, headers=headers, params=params)
+                if res.status_code == 200:
+                    rows = res.json()
+                    if rows:
+                        user_id = rows[0].get("id")
+        except Exception as e:
+            print(f"Error querying user from Supabase: {e}")
+
+    if not user_id:
+        # SQLite fallback check or if Supabase check returned nothing
+        init_db()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email_clean,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            user_id = row[0]
+    
+    # If user still doesn't have a UUID, generate one
+    if not user_id:
+        user_id = str(uuid.uuid4())
+
+    # Upsert into Supabase
+    if is_supabase_enabled():
+        url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/users"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        body = {
+            "id": user_id,
+            "email": email_clean,
+            "name": name,
+            "picture": picture,
+            "last_login": now_str
+        }
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                # Upsert using POST with on_conflict parameter
+                upsert_url = f"{url}?on_conflict=email"
+                res = client.post(upsert_url, headers=headers, json=body)
+                if res.status_code in [200, 201]:
+                    return user_id
+                else:
+                    print(f"Supabase user upsert failed ({res.status_code}): {res.text}. Falling back to SQLite.")
+        except Exception as e:
+            print(f"Error upserting user to Supabase: {e}. Falling back to SQLite.")
+
+    # SQLite fallback upsert
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO users (id, email, name, picture, last_login)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                name=excluded.name,
+                picture=excluded.picture,
+                last_login=excluded.last_login
+        """, (user_id, email_clean, name, picture, now_str))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to upsert user locally: {e}")
+    finally:
+        conn.close()
+
+    return user_id

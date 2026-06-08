@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Response, Cookie
 from typing import Optional
 from fastapi.responses import RedirectResponse
-from app.services import config_service, sheets_service
+from app.services import config_service, sheets_service, db_service
 from app.config import settings
 from google_auth_oauthlib.flow import Flow
 import os
@@ -128,10 +128,18 @@ def oauth_callback(code: str, state: str):
             except Exception:
                 pass
 
+        email = user_info.get("email", "")
+        name = user_info.get("name", "")
+        picture = user_info.get("picture", "")
+
+        # Save user to DB and get UUID
+        user_uuid = db_service.upsert_user(email, name, picture) if email else ""
+
         session_data = {
-            "email": user_info.get("email", ""),
-            "name": user_info.get("name", ""),
-            "picture": user_info.get("picture", "")
+            "id": user_uuid,
+            "email": email,
+            "name": name,
+            "picture": picture
         }
         session_json = _json.dumps(session_data)
         session_cookie = base64.b64encode(session_json.encode("utf-8")).decode("utf-8")
@@ -183,6 +191,7 @@ def auth_status(user_session: Optional[str] = Cookie(None)):
             return {"authenticated": False}
         return {
             "authenticated": True,
+            "id": session_data.get("id", ""),
             "email": session_data.get("email", ""),
             "name": session_data.get("name", ""),
             "picture": session_data.get("picture", "")
