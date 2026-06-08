@@ -271,7 +271,7 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             return data
         except Exception as csv_err:
             print(f"Public CSV fallback failed: {csv_err}")
-            raise RuntimeError(str(csv_err))
+            raise RuntimeError(f"Google Sheets API Error: {api_err}. Fallback Error: {csv_err}")
 
 def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
     """Appends a new lead row to the Google Sheet. Clears cache."""
