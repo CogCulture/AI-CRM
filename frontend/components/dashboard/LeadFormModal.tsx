@@ -129,7 +129,6 @@ export default function LeadFormModal({
                       <option value="Hot">Hot</option>
                       <option value="Warm">Warm</option>
                       <option value="Cold">Cold</option>
-                      <option value="Dead lead">Dead lead</option>
                     </select>
                   ) : isStageDropdown ? (
                     <select
