@@ -58,6 +58,48 @@ const getCampaignIcon = (name: string) => {
   );
 };
 
+// Helper to parse dates like DD/MM/YYYY or DD-MM-YYYY
+const parseDate = (dateVal: any): Date | null => {
+  if (!dateVal) return null;
+  const dateStr = String(dateVal).trim();
+  if (!dateStr || dateStr === "—" || dateStr.toLowerCase() === "placeholder") return null;
+
+  const parts = dateStr.split(/[-/.]/);
+  if (parts.length === 3) {
+    const p0 = parseInt(parts[0], 10);
+    const p1 = parseInt(parts[1], 10);
+    const p2 = parseInt(parts[2], 10);
+
+    if (!isNaN(p0) && !isNaN(p1) && !isNaN(p2)) {
+      // YYYY-MM-DD
+      if (parts[0].length === 4) {
+        return new Date(p0, p1 - 1, p2);
+      }
+      // DD-MM-YYYY or DD/MM/YYYY
+      if (parts[2].length === 4) {
+        return new Date(p2, p1 - 1, p0);
+      }
+    }
+  }
+  const parsed = Date.parse(dateStr);
+  return isNaN(parsed) ? null : new Date(parsed);
+};
+
+// Helper to format date cleanly as YYYY-MM-DD
+const formatDisplayDate = (dateVal: any): string => {
+  if (!dateVal) return "—";
+  const dateStr = String(dateVal).trim();
+  if (!dateStr || dateStr === "—" || dateStr.toLowerCase() === "placeholder") return "—";
+  
+  const parsed = parseDate(dateStr);
+  if (!parsed) return dateStr;
+  
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function CRMTable({
   headers,
   rows,
@@ -399,6 +441,15 @@ export default function CRMTable({
                       const isStatus = colLower.includes("status");
                       const isStage = colLower.includes("stage");
                       const isType = colLower.includes("type");
+                      const isDate = colLower.includes("date") || colLower.includes("deadline") || colLower.includes("due");
+
+                      if (isDate && cellVal.trim() !== "") {
+                        return (
+                          <span className="font-mono text-gray-700 dark:text-[#dedee5]">
+                            {formatDisplayDate(cellVal)}
+                          </span>
+                        );
+                      }
                       
                       // Render statuses or stages as badges only if the value is short (e.g., standard status keywords)
                       if ((isStatus || isStage) && cellVal.trim() !== "" && cellVal.length <= 20) {
