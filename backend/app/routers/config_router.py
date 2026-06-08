@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from app.services import config_service
+from app.services.auth_service import get_admin_user
 
 router = APIRouter()
 
@@ -15,16 +16,16 @@ class ConfigUpdate(BaseModel):
     mandatory_columns: Optional[List[str]] = None
 
 @router.get("/")
-def get_config():
+def get_config(admin: dict = Depends(get_admin_user)):
     return config_service.load_config()
 
 @router.patch("/")
-def update_config(body: ConfigUpdate):
+def update_config(body: ConfigUpdate, admin: dict = Depends(get_admin_user)):
     updates = body.model_dump(exclude_none=True)
     return config_service.update_config(updates)
 
 @router.post("/test-connection")
-def test_connection(body: dict):
+def test_connection(body: dict, admin: dict = Depends(get_admin_user)):
     """Test if a sheet URL is accessible before saving."""
     from app.services.sheets_service import fetch_sheet_data
     try:
