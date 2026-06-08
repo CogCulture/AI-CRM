@@ -314,7 +314,7 @@ export default function SheetConfigurator() {
 
   const handleSignOut = async () => {
     try {
-      await api.signOut();
+      await api.disconnectSheets();
       setAuthStatus({ authenticated: false, loading: false });
       toast.success("Signed out from Google");
     } catch (err: any) {

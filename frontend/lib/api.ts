@@ -33,6 +33,7 @@ export const api = {
     picture?: string;
   }>("/api/sheets/auth-status"),
   signOut: () => apiFetch<{ ok: boolean }>("/api/sheets/signout", { method: "POST" }),
+  disconnectSheets: () => apiFetch<{ ok: boolean }>("/api/sheets/disconnect-sheets", { method: "POST" }),
   addLead: (leadData: Record<string, any>) =>
     apiFetch<{ ok: boolean }>("/api/sheets/lead", { method: "POST", body: JSON.stringify(leadData) }),
   updateLead: (rowNum: number, leadData: Record<string, any>) =>

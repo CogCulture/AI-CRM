@@ -170,6 +170,7 @@ def get_summary(bypass_cache: bool = False):
         "visible_columns": cfg.get("visible_columns", []),
         "column_order": cfg.get("column_order", []),
         "graphs": cfg.get("graphs", []),
+        "mandatory_columns": cfg.get("mandatory_columns", []),
     }
 
 

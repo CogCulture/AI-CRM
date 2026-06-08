@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response, Cookie
+from typing import Optional
 from fastapi.responses import RedirectResponse
 from app.services import config_service, sheets_service
 from app.config import settings
@@ -98,6 +99,7 @@ def oauth_callback(code: str, state: str):
         credentials = flow.credentials
         
         import json as _json
+        import base64
         creds_data = {
             "token": credentials.token,
             "refresh_token": credentials.refresh_token,
@@ -107,12 +109,46 @@ def oauth_callback(code: str, state: str):
             "scopes": credentials.scopes,
             "id_token": credentials.id_token
         }
-        with open(_get_token_path(), "w") as f:
-            _json.dump(creds_data, f)
+
+        # Check if the state redirect URL is settings or admin (indicating admin sheets setup)
+        is_admin_setup = "/settings" in (state or "") or "/admin" in (state or "")
+
+        if is_admin_setup:
+            with open(_get_token_path(), "w") as f:
+                _json.dump(creds_data, f)
             
+        # Parse user info from id_token
+        user_info = {}
+        id_token = creds_data.get("id_token", "")
+        if id_token:
+            try:
+                payload_b64 = id_token.split(".")[1]
+                payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                user_info = _json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
+            except Exception:
+                pass
+
+        session_data = {
+            "email": user_info.get("email", ""),
+            "name": user_info.get("name", ""),
+            "picture": user_info.get("picture", "")
+        }
+        session_json = _json.dumps(session_data)
+        session_cookie = base64.b64encode(session_json.encode("utf-8")).decode("utf-8")
+
         frontend_url = state if state else "http://localhost:3001/admin"
         separator = "&" if "?" in frontend_url else "?"
-        return RedirectResponse(f"{frontend_url}{separator}auth=success")
+        
+        response = RedirectResponse(f"{frontend_url}{separator}auth=success")
+        response.set_cookie(
+            key="user_session",
+            value=session_cookie,
+            max_age=30 * 24 * 60 * 60,  # 30 days
+            httponly=True,
+            samesite="lax",
+            secure=False
+        )
+        return response
     except Exception as e:
         frontend_url = state if state else "http://localhost:3001/admin"
         separator = "&" if "?" in frontend_url else "?"
@@ -120,71 +156,36 @@ def oauth_callback(code: str, state: str):
         return RedirectResponse(f"{frontend_url}{separator}auth=failure&error={err_msg}")
 
 @router.post("/signout")
-def signout():
+def signout(response: Response):
+    response.delete_cookie(key="user_session")
+    return {"ok": True}
+
+@router.post("/disconnect-sheets")
+def disconnect_sheets():
     token_path = _get_token_path()
     if os.path.exists(token_path):
         try:
             os.remove(token_path)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to sign out: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to disconnect sheets: {e}")
     return {"ok": True}
 
 @router.get("/auth-status")
-def auth_status():
-    token_path = _get_token_path()
-    if not os.path.exists(token_path):
+def auth_status(user_session: Optional[str] = Cookie(None)):
+    if not user_session:
         return {"authenticated": False}
     try:
-        from google.oauth2.credentials import Credentials
-        creds = Credentials.from_authorized_user_file(token_path)
-        
-        # If expired, attempt refresh
-        if creds.expired and creds.refresh_token:
-            try:
-                from google.auth.transport.requests import Request
-                creds.refresh(Request())
-                with open(token_path, "w") as f:
-                    f.write(creds.to_json())
-            except Exception:
-                pass
-
-        import httpx
-        # Call userinfo endpoint using access token
-        headers = {"Authorization": f"Bearer {creds.token}"}
-        res = httpx.get("https://www.googleapis.com/oauth2/v3/userinfo", headers=headers)
-        if res.status_code == 200:
-            user_data = res.json()
-            return {
-                "authenticated": True,
-                "email": user_data.get("email", ""),
-                "name": user_data.get("name", ""),
-                "picture": user_data.get("picture", "")
-            }
-
-        # Fallback to id_token if API request fails
         import base64
         import json as _json
-        account_info = {}
-        with open(token_path, "r") as f:
-            raw = _json.load(f)
-        id_token = raw.get("id_token", "")
-        if id_token:
-            try:
-                payload_b64 = id_token.split(".")[1]
-                payload_b64 += "=" * (4 - len(payload_b64) % 4)
-                payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
-                account_info = {
-                    "email": payload.get("email", ""),
-                    "name": payload.get("name", ""),
-                    "picture": payload.get("picture", "")
-                }
-            except Exception:
-                pass
-
+        decoded_cookie = base64.b64decode(user_session.encode("utf-8")).decode("utf-8")
+        session_data = _json.loads(decoded_cookie)
+        if not session_data.get("email"):
+            return {"authenticated": False}
         return {
             "authenticated": True,
-            "expired": creds.expired,
-            **account_info
+            "email": session_data.get("email", ""),
+            "name": session_data.get("name", ""),
+            "picture": session_data.get("picture", "")
         }
     except Exception:
         return {"authenticated": False}
