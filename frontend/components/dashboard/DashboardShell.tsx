@@ -50,21 +50,20 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         const status = await api.getAuthStatus();
         if (!status.authenticated) {
           router.replace("/login");
-          return;
         } else if (status.email && !isWorkEmail(status.email)) {
           await api.signOut();
           router.replace("/login?error=work_email_required");
-          return;
         } else {
           setUser({
             name: status.name || "Authorized User",
             email: status.email || "Google Account",
             picture: status.picture || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80"
           });
-          setLoading(false);
         }
       } catch (err) {
         router.replace("/login");
+      } finally {
+        setLoading(false);
       }
     }
     checkAuth();

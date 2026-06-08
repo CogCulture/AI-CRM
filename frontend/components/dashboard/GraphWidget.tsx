@@ -24,9 +24,9 @@ const COLORS = ["#86F3D4", "#38BDF8", "#4E60A6", "#548CA8", "#F59E0B", "#EF4444"
 
 const getSegmentColor = (name: string, index: number): string => {
   const norm = name.toLowerCase().trim();
-  if (norm === "cold") return "#93C5FD"; // light blue
-  if (norm === "warm") return "#FCA5A5"; // light red
-  if (norm === "hot") return "#DC2626"; // dark red
+  if (norm === "cold") return "#3B82F6"; // blue-500
+  if (norm === "warm") return "#F59E0B"; // amber-500
+  if (norm === "hot") return "#EF4444"; // red-500
   return COLORS[index % COLORS.length];
 };
 

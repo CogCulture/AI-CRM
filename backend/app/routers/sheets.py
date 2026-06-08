@@ -1,8 +1,7 @@
-from fastapi import APIRouter, HTTPException, Response, Cookie, Depends
+from fastapi import APIRouter, HTTPException, Response, Cookie
 from typing import Optional
 from fastapi.responses import RedirectResponse
 from app.services import config_service, sheets_service
-from app.services.auth_service import get_admin_user
 from app.config import settings
 from google_auth_oauthlib.flow import Flow
 import os
@@ -162,7 +161,7 @@ def signout(response: Response):
     return {"ok": True}
 
 @router.post("/disconnect-sheets")
-def disconnect_sheets(admin: dict = Depends(get_admin_user)):
+def disconnect_sheets():
     token_path = _get_token_path()
     if os.path.exists(token_path):
         try:
@@ -231,7 +230,7 @@ import openpyxl
 from app.services import leads_service
 
 @router.post("/import")
-async def import_leads_file(file: UploadFile = File(...), admin: dict = Depends(get_admin_user)):
+async def import_leads_file(file: UploadFile = File(...)):
     filename = file.filename or ""
     contents = await file.read()
     

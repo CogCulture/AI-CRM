@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = "aryan@cogculture.agency"
     smtp_password: str = ""
-    admin_emails: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
