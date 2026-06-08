@@ -137,7 +137,7 @@ export default function LeadFormModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white font-sans tracking-wide">
-            {title}
+            {initialData?._row_num ? `Update Lead (COG-${1000 + Number(initialData._row_num)})` : title}
           </h3>
           <button
             onClick={onClose}

@@ -100,6 +100,13 @@ const formatDisplayDate = (dateVal: any): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// Helper to generate a unique Lead ID based on _row_num
+const getLeadId = (row: Record<string, any>): string => {
+  const rowNum = row._row_num;
+  if (!rowNum) return "—";
+  return `COG-${1000 + Number(rowNum)}`;
+};
+
 export default function CRMTable({
   headers,
   rows,
@@ -116,6 +123,7 @@ export default function CRMTable({
 
   const isNumericColumn = (colName: string) => {
     const norm = colName.toLowerCase();
+    if (norm === "lead id") return false;
     return ["visitors", "contacts", "companies", "leads", "value", "amount", "revenue", "no."].some(x => norm.includes(x));
   };
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -150,7 +158,7 @@ export default function CRMTable({
 
   // Determine active columns and order
   const displayCols = columnOrder.length > 0 ? columnOrder : [...headers];
-  const activeCols = displayCols.filter((col) => {
+  const activeColsRaw = displayCols.filter((col) => {
     if (visibleColumns.length === 0) return headers.includes(col);
     // Show if it's explicitly visible, or if it's a new column not yet present in columnOrder config
     return (visibleColumns.includes(col) || (headers.includes(col) && !columnOrder.includes(col))) && headers.includes(col);
@@ -160,9 +168,12 @@ export default function CRMTable({
   headers.forEach((h) => {
     if (!displayCols.includes(h)) {
       displayCols.push(h);
-      activeCols.push(h); // Make it visible by default since it is brand new
+      activeColsRaw.push(h); // Make it visible by default since it is brand new
     }
   });
+
+  // Inject "Lead ID" at the very beginning of the active columns list (filtering out any duplicates)
+  const activeCols = ["Lead ID", ...activeColsRaw.filter((col) => col !== "Lead ID")];
 
   // Sorting logic
   const handleSort = (col: string) => {
@@ -176,9 +187,10 @@ export default function CRMTable({
 
   // Filter rows based on search and selected options
   const filteredRows = rows.filter((row) => {
+    const leadId = getLeadId(row).toLowerCase();
     const matchesSearch = Object.values(row).some((val) =>
       String(val).toLowerCase().includes(activeSearch.toLowerCase())
-    );
+    ) || leadId.includes(activeSearch.toLowerCase());
 
     let matchesType = true;
     if (typeColumn && selectedType !== "All") {
@@ -197,11 +209,11 @@ export default function CRMTable({
   const sortedRows = [...filteredRows];
   if (sortColumn) {
     sortedRows.sort((a, b) => {
-      const valA = a[sortColumn] || "";
-      const valB = b[sortColumn] || "";
+      let valA = sortColumn === "Lead ID" ? getLeadId(a) : (a[sortColumn] || "");
+      let valB = sortColumn === "Lead ID" ? getLeadId(b) : (b[sortColumn] || "");
       
-      const numA = parseFloat(valA.replace(/[^0-9.-]/g, ""));
-      const numB = parseFloat(valB.replace(/[^0-9.-]/g, ""));
+      const numA = parseFloat(String(valA).replace(/[^0-9.-]/g, ""));
+      const numB = parseFloat(String(valB).replace(/[^0-9.-]/g, ""));
       
       if (!isNaN(numA) && !isNaN(numB)) {
         return sortDirection === "asc" ? numA - numB : numB - numA;
@@ -397,7 +409,7 @@ export default function CRMTable({
                   style={{ animationDelay: `${rowIdx * 30}ms` }}
                 >
                   {activeCols.map((col, idx) => {
-                    const cellVal = String(row[col] || "");
+                    const cellVal = col === "Lead ID" ? getLeadId(row) : String(row[col] || "");
                     const isNo = col.toLowerCase() === "no.";
                     const isCampaign = col.toLowerCase() === "campaign";
                     const isValue = ["value", "amount", "revenue", "estimations", "deal size"].some(x => col.toLowerCase().includes(x));
@@ -423,6 +435,13 @@ export default function CRMTable({
                     
                     // Render formatted cells
                     const renderCellContent = () => {
+                      if (col === "Lead ID") {
+                        return (
+                          <span className="font-semibold text-gray-950 dark:text-white font-mono">
+                            {cellVal}
+                          </span>
+                        );
+                      }
                       if (isValue) {
                         // Apply currency formatting prefix if not already present
                         const cleanVal = cellVal.replace(/[₹$,\s]/g, "");
