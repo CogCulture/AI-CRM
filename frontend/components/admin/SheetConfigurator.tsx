@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircle2, XCircle, AlertCircle, Database, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, ShieldCheck, Save, Mail, Trash2, Plus } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Database, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, ShieldCheck, Save, Mail, Trash2, Plus, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Config } from "@/lib/types";
@@ -15,7 +15,8 @@ export default function SheetConfigurator() {
     visible_columns: [],
     column_order: [],
     graphs: [],
-    report_recipients: []
+    report_recipients: [],
+    mandatory_columns: []
   });
 
   const [dbStatus, setDbStatus] = useState<{
@@ -92,6 +93,20 @@ export default function SheetConfigurator() {
       await api.updateConfig({ report_recipients: updated });
       setConfig(prev => ({ ...prev, report_recipients: updated }));
       toast.success("Recipient removed");
+    } catch (err: any) {
+      toast.error("Failed to update config");
+    }
+  };
+
+  const handleToggleMandatory = async (header: string) => {
+    const current = config.mandatory_columns || [];
+    const updated = current.includes(header)
+      ? current.filter(h => h !== header)
+      : [...current, header];
+    try {
+      await api.updateConfig({ mandatory_columns: updated });
+      setConfig(prev => ({ ...prev, mandatory_columns: updated }));
+      toast.success(`Updated validation for ${header}`);
     } catch (err: any) {
       toast.error("Failed to update config");
     }
@@ -743,6 +758,60 @@ export default function SheetConfigurator() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Mandatory Form Fields Card */}
+      <div className="bg-white dark:bg-[#0C0C12]/20 rounded-xl p-6 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] shadow-xl space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
+            <ClipboardList className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-white tracking-wide">
+              Mandatory Lead Fields
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-[#888899]">
+              Define which CRM schema columns are required when users add or update leads
+            </p>
+          </div>
+        </div>
+
+        {dbStatus.headers.length === 0 ? (
+          <p className="text-xs text-gray-400 dark:text-[#555566] italic">
+            No columns detected. Please load/seed a database or link a sheet first.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
+              Select Required Columns
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {dbStatus.headers
+                .filter((h) => h !== "_row_num" && h.toLowerCase() !== "no.")
+                .map((header) => {
+                  const isMandatory = config.mandatory_columns?.includes(header) || false;
+                  return (
+                    <label
+                      key={header}
+                      className={`flex items-center gap-2.5 p-3 rounded-lg border text-xs font-semibold cursor-pointer transition-all duration-200 select-none ${
+                        isMandatory
+                          ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.02)]"
+                          : "border-gray-200 dark:border-white/5 bg-gray-55/30 dark:bg-white/1 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-white/10"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isMandatory}
+                        onChange={() => handleToggleMandatory(header)}
+                        className="rounded border-gray-300 dark:border-white/10 text-emerald-600 focus:ring-emerald-500/50 w-3.5 h-3.5 cursor-pointer accent-emerald-500"
+                      />
+                      <span className="truncate">{header}</span>
+                    </label>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

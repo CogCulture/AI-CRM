@@ -737,6 +737,7 @@ function DashboardContent() {
               initialData={selectedLead}
               onSave={handleSaveLead}
               title={modalTitle}
+              mandatoryColumns={summary?.mandatory_columns || []}
             />
           )}
         </div>

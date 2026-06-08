@@ -13,6 +13,7 @@ export interface Config {
   column_order: string[];
   graphs: GraphConfig[];
   report_recipients?: string[];
+  mandatory_columns?: string[];
 }
 
 export interface GraphConfig {
@@ -30,4 +31,5 @@ export interface DashboardSummary {
   visible_columns: string[];
   column_order: string[];
   graphs: GraphConfig[];
+  mandatory_columns?: string[];
 }

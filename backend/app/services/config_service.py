@@ -8,7 +8,8 @@ DEFAULT_CONFIG = {
     "visible_columns": [],      # [] = all visible
     "column_order": [],
     "graphs": [],                # [{ id, type, x_col, y_col, title }]
-    "report_recipients": []      # List of emails to receive daily summary at 11:30 am
+    "report_recipients": [],     # List of emails to receive daily summary at 11:30 am
+    "mandatory_columns": []      # List of column names that are mandatory in lead forms
 }
 
 def _path(): return settings.config_store_path

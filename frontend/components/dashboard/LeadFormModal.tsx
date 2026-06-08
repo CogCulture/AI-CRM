@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
+import { toast } from "sonner";
 
 interface LeadFormModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface LeadFormModalProps {
   initialData?: Record<string, any> | null;
   onSave: (data: Record<string, any>) => Promise<void>;
   title: string;
+  mandatoryColumns?: string[];
 }
 
 export default function LeadFormModal({
@@ -19,6 +21,7 @@ export default function LeadFormModal({
   initialData,
   onSave,
   title,
+  mandatoryColumns = [],
 }: LeadFormModalProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -55,6 +58,21 @@ export default function LeadFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check mandatory fields validation
+    const missing: string[] = [];
+    (mandatoryColumns || []).forEach((col) => {
+      const val = (formData[col] || "").trim();
+      if (!val) {
+        missing.push(col);
+      }
+    });
+
+    if (missing.length > 0) {
+      toast.error(`The following field(s) are required: ${missing.join(", ")}`);
+      return;
+    }
+
     setLoading(true);
     try {
       await onSave(formData);
@@ -93,11 +111,12 @@ export default function LeadFormModal({
               const isStatusDropdown = hl === "status";
               const isStageDropdown = hl === "stage";
               const val = formData[header] || "";
+              const isRequired = mandatoryColumns.includes(header);
 
               return (
                 <div key={header} className="space-y-1.5 flex flex-col">
                   <label className="text-[10px] font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
-                    {header}
+                    {header} {isRequired && <span className="text-red-500 font-bold ml-0.5">*</span>}
                   </label>
                   
                   {isStatusDropdown ? (
