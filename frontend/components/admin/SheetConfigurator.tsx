@@ -166,7 +166,9 @@ export default function SheetConfigurator() {
   // Mode switching save
   const handleSwitchMode = async (mode: "local" | "sheets") => {
     if (mode === "local") {
-      const confirmed = window.confirm("Switch to Local Database mode? Leads will be managed locally in the CRM browser dashboard.");
+      const confirmed = window.confirm(
+        "Switch to Local Database (CSV/Excel) mode?\n\nThis will deactivate the Google Sheets sync. Leads will be managed locally in the CRM."
+      );
       if (!confirmed) return;
       
       try {
@@ -180,6 +182,12 @@ export default function SheetConfigurator() {
         toast.error(err.message || "Failed to switch mode");
       }
     } else {
+      // Switching to sheets: confirm only if currently active on local
+      if (!isCurrentModeLocal) { setActiveTab("sheets"); return; }
+      const confirmed = window.confirm(
+        "Switch to Google Sheets Sync mode?\n\nThis will deactivate the local SQLite storage. Enter and save a Sheet URL below to activate."
+      );
+      if (!confirmed) return;
       setActiveTab("sheets");
     }
   };
@@ -336,27 +344,98 @@ export default function SheetConfigurator() {
         </p>
       </div>
 
-      {/* Mode Switcher Tabs */}
-      <div className="flex border-b border-gray-200 dark:border-white/10 gap-6">
+      {/* Mode Switcher — Exclusive Radio Cards */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Local DB card */}
         <button
-          onClick={() => setActiveTab("local")}
-          className={`pb-3 text-sm font-semibold tracking-wide border-b-2 transition-all cursor-pointer ${
+          type="button"
+          id="mode-local-btn"
+          onClick={() => {
+            if (activeTab === "local") return; // already on this tab
+            handleSwitchMode("local");
+          }}
+          disabled={activeTab === "local"}
+          className={`relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all duration-200 ${
             activeTab === "local"
-              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-              : "border-transparent text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              ? "border-emerald-500 bg-emerald-500/5 shadow-[0_0_16px_rgba(16,185,129,0.12)] cursor-default"
+              : "border-gray-200 dark:border-white/10 hover:border-emerald-500/50 cursor-pointer"
           }`}
         >
-          Local SQLite Database (Excel/CSV)
+          <div className={`mt-0.5 p-2 rounded-lg border ${
+            activeTab === "local"
+              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+              : "bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-400"
+          }`}>
+            <Database className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">Local Database</span>
+              {activeTab === "local" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Active
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-[#888899] mt-0.5">
+              Upload CSV / Excel file. Leads stored locally in SQLite.
+            </p>
+          </div>
+          {/* Radio dot */}
+          <div className={`mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+            activeTab === "local"
+              ? "border-emerald-500"
+              : "border-gray-300 dark:border-white/20"
+          }`}>
+            {activeTab === "local" && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+          </div>
         </button>
+
+        {/* Sheets card */}
         <button
-          onClick={() => handleSwitchMode("sheets")}
-          className={`pb-3 text-sm font-semibold tracking-wide border-b-2 transition-all cursor-pointer ${
+          type="button"
+          id="mode-sheets-btn"
+          onClick={() => {
+            if (activeTab === "sheets") return; // already on this tab
+            handleSwitchMode("sheets");
+          }}
+          disabled={activeTab === "sheets"}
+          className={`relative flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all duration-200 ${
             activeTab === "sheets"
-              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-              : "border-transparent text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              ? "border-blue-500 bg-blue-500/5 shadow-[0_0_16px_rgba(59,130,246,0.12)] cursor-default"
+              : "border-gray-200 dark:border-white/10 hover:border-blue-500/50 cursor-pointer"
           }`}
         >
-          Google Sheets Live Sync
+          <div className={`mt-0.5 p-2 rounded-lg border ${
+            activeTab === "sheets"
+              ? "bg-blue-500/15 border-blue-500/30 text-blue-400"
+              : "bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-400"
+          }`}>
+            <FileSpreadsheet className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">Google Sheets Sync</span>
+              {activeTab === "sheets" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-500 border border-blue-500/30 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  Active
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-[#888899] mt-0.5">
+              Link a live Google Sheet. Data synced dynamically.
+            </p>
+          </div>
+          {/* Radio dot */}
+          <div className={`mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+            activeTab === "sheets"
+              ? "border-blue-500"
+              : "border-gray-300 dark:border-white/20"
+          }`}>
+            {activeTab === "sheets" && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+          </div>
         </button>
       </div>
 
