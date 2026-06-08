@@ -39,6 +39,21 @@ const parseDate = (dateVal: any): Date | null => {
   return isNaN(parsed) ? null : new Date(parsed);
 };
 
+// Helper to format date cleanly as YYYY-MM-DD
+const formatDisplayDate = (dateVal: any): string => {
+  if (!dateVal) return "—";
+  const dateStr = String(dateVal).trim();
+  if (!dateStr || dateStr === "—" || dateStr.toLowerCase() === "placeholder") return "—";
+  
+  const parsed = parseDate(dateStr);
+  if (!parsed) return dateStr;
+  
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function DataPlatformView({ sheetData, onRefresh }: DataPlatformViewProps) {
   const [activeFilter, setActiveFilter] = useState<"ongoing" | "expired" | "due_today">("ongoing");
   const [searchTerm, setSearchTerm] = useState("");
@@ -297,7 +312,7 @@ export default function DataPlatformView({ sheetData, onRefresh }: DataPlatformV
                       key={idx} 
                       className="border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50/30 dark:hover:bg-white/2 transition-colors text-xs font-sans text-gray-900 dark:text-gray-100"
                     >
-                      <td className="py-3 px-4 font-mono">{dateCol ? row[dateCol] : "—"}</td>
+                      <td className="py-3 px-4 font-mono">{dateCol ? formatDisplayDate(row[dateCol]) : "—"}</td>
                       <td className="py-3 px-4 font-semibold text-gray-900 dark:text-white">
                         {companyCol ? row[companyCol] : "—"}
                       </td>
@@ -333,7 +348,7 @@ export default function DataPlatformView({ sheetData, onRefresh }: DataPlatformV
                           activeFilter === "expired" ? "text-red-500 font-semibold" : 
                           activeFilter === "due_today" ? "text-amber-500 font-semibold animate-pulse" : "text-gray-600 dark:text-gray-400"
                         }`}>
-                          {dlVal || "—"}
+                          {formatDisplayDate(dlVal)}
                         </span>
                       </td>
                       <td className="py-3 px-4">{pocCol ? row[pocCol] : "—"}</td>

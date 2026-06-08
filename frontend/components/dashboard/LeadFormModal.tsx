@@ -14,6 +14,44 @@ interface LeadFormModalProps {
   mandatoryColumns?: string[];
 }
 
+// Helper to parse dates like DD/MM/YYYY or DD-MM-YYYY
+const parseDate = (dateVal: any): Date | null => {
+  if (!dateVal) return null;
+  const dateStr = String(dateVal).trim();
+  if (!dateStr || dateStr === "—" || dateStr.toLowerCase() === "placeholder") return null;
+
+  const parts = dateStr.split(/[-/.]/);
+  if (parts.length === 3) {
+    const p0 = parseInt(parts[0], 10);
+    const p1 = parseInt(parts[1], 10);
+    const p2 = parseInt(parts[2], 10);
+
+    if (!isNaN(p0) && !isNaN(p1) && !isNaN(p2)) {
+      // YYYY-MM-DD
+      if (parts[0].length === 4) {
+        return new Date(p0, p1 - 1, p2);
+      }
+      // DD-MM-YYYY or DD/MM/YYYY
+      if (parts[2].length === 4) {
+        return new Date(p2, p1 - 1, p0);
+      }
+    }
+  }
+  const parsed = Date.parse(dateStr);
+  return isNaN(parsed) ? null : new Date(parsed);
+};
+
+// Helper to format date cleanly as YYYY-MM-DD for date inputs
+const formatDateForInput = (dateVal: any): string => {
+  if (!dateVal) return "";
+  const parsed = parseDate(dateVal);
+  if (!parsed) return String(dateVal).trim();
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function LeadFormModal({
   isOpen,
   onClose,
@@ -35,7 +73,13 @@ export default function LeadFormModal({
     if (initialData) {
       const parsed: Record<string, string> = {};
       formHeaders.forEach((h) => {
-        parsed[h] = String(initialData[h] || "");
+        const hl = h.toLowerCase();
+        const rawVal = initialData[h];
+        if (hl.includes("date") || hl.includes("deadline") || hl.includes("due")) {
+          parsed[h] = formatDateForInput(rawVal);
+        } else {
+          parsed[h] = String(rawVal || "");
+        }
       });
       setFormData(parsed);
     } else {
@@ -147,8 +191,8 @@ export default function LeadFormModal({
                     </select>
                   ) : (
                     <input
-                      type={hl.includes("date") || hl.includes("deadline") ? "text" : "text"}
-                      placeholder={hl.includes("date") ? "DD/MM/YYYY" : `Enter ${header}...`}
+                      type={hl.includes("date") || hl.includes("deadline") || hl.includes("due") ? "date" : "text"}
+                      placeholder={`Enter ${header}...`}
                       value={val}
                       onChange={(e) => handleChange(header, e.target.value)}
                       className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none"
