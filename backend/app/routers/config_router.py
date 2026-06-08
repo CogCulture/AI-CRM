@@ -11,6 +11,7 @@ class ConfigUpdate(BaseModel):
     visible_columns: Optional[List[str]] = None
     column_order: Optional[List[str]] = None
     graphs: Optional[List[dict]] = None
+    report_recipients: Optional[List[str]] = None
 
 @router.get("/")
 def get_config():

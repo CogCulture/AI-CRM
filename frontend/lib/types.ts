@@ -12,6 +12,7 @@ export interface Config {
   visible_columns: string[];
   column_order: string[];
   graphs: GraphConfig[];
+  report_recipients?: string[];
 }
 
 export interface GraphConfig {

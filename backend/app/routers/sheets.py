@@ -194,8 +194,6 @@ def add_lead(body: dict):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
     range_name = cfg.get("sheet_range", "Sheet1")
-    if not sheet_url:
-        raise HTTPException(status_code=400, detail="Sheet URL is not configured.")
     try:
         res = sheets_service.append_lead_row(sheet_url, range_name, body)
         return res
@@ -207,8 +205,6 @@ def update_lead(row_num: int, body: dict):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
     range_name = cfg.get("sheet_range", "Sheet1")
-    if not sheet_url:
-        raise HTTPException(status_code=400, detail="Sheet URL is not configured.")
     try:
         res = sheets_service.update_lead_row(sheet_url, range_name, row_num, body)
         return res
@@ -220,10 +216,96 @@ def delete_lead(row_num: int):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
     range_name = cfg.get("sheet_range", "Sheet1")
-    if not sheet_url:
-        raise HTTPException(status_code=400, detail="Sheet URL is not configured.")
     try:
         res = sheets_service.delete_lead_row(sheet_url, range_name, row_num)
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+from fastapi import File, UploadFile
+import io
+import csv
+import openpyxl
+from app.services import leads_service
+
+@router.post("/import")
+async def import_leads_file(file: UploadFile = File(...)):
+    filename = file.filename or ""
+    contents = await file.read()
+    
+    rows_list = []
+    
+    try:
+        if filename.endswith(".csv"):
+            decoded = contents.decode("utf-8-sig", errors="ignore")
+            reader = csv.reader(io.StringIO(decoded))
+            rows_list = list(reader)
+        elif filename.endswith((".xlsx", ".xls")):
+            wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+            sheet = wb.active
+            if sheet:
+                # Iterate and filter only hidden/empty rows
+                for r_idx in range(1, sheet.max_row + 1):
+                    if r_idx in sheet.row_dimensions and sheet.row_dimensions[r_idx].hidden:
+                        continue
+                    
+                    row = sheet[r_idx]
+                    if not any(cell.value is not None for cell in row):
+                        continue
+                        
+                    row_vals = [str(cell.value).strip() if cell.value is not None else "" for cell in row]
+                    rows_list.append(row_vals)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file format. Please upload a CSV (.csv) or Excel (.xlsx) file."
+            )
+    except Exception as parse_err:
+        if isinstance(parse_err, HTTPException):
+            raise parse_err
+        raise HTTPException(status_code=400, detail=f"Failed to parse spreadsheet: {str(parse_err)}")
+
+    if not rows_list:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+
+    # Process headers
+    from app.services.sheets_service import _deduplicate_headers
+    raw_headers = rows_list[0]
+    headers = _deduplicate_headers(raw_headers)
+    
+    # Process data rows
+    rows_data = rows_list[1:]
+    normalized_rows = []
+    
+    for idx, r in enumerate(rows_data):
+        row_dict = {}
+        row_has_data = False
+        
+        for i in range(len(headers)):
+            val = r[i].strip() if i < len(r) else ""
+            row_dict[headers[i]] = val
+            if val != "":
+                row_has_data = True
+                
+        if row_has_data:
+            # Skip divider rows (e.g. "SEPTEMBER LEADS")
+            non_empty_vals = [v for k, v in row_dict.items() if v != ""]
+            if len(non_empty_vals) <= 1:
+                # If only one column has data (or none), it's likely a divider row
+                continue
+            normalized_rows.append(row_dict)
+
+    if not normalized_rows:
+        raise HTTPException(status_code=400, detail="No valid data rows found in the uploaded file.")
+
+    try:
+        leads_service.import_leads(headers, normalized_rows)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save imported leads: {str(e)}")
+
+    return {
+        "ok": True,
+        "row_count": len(normalized_rows),
+        "headers": headers
+    }
+

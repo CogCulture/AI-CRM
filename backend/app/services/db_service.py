@@ -28,6 +28,14 @@ def init_db():
             sent_at TEXT
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 

@@ -152,8 +152,9 @@ def _fetch_public_csv(sheet_url: str) -> dict:
 
 def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: bool = False) -> dict:
     """Returns { headers: [...], rows: [[...], ...], total: int }"""
-    if not sheet_url or sheet_url.strip() == "" or sheet_url == "mock":
-        return {"headers": MOCK_HEADERS, "rows": MOCK_ROWS, "total": len(MOCK_ROWS), "is_mock": True}
+    if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
+        from app.services import leads_service
+        return leads_service.get_all_leads()
 
     cache_key = f"{sheet_url}:{range_name}"
     if not bypass_cache and cache_key in _cache:
@@ -274,6 +275,9 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
 
 def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
     """Appends a new lead row to the Google Sheet. Clears cache."""
+    if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
+        from app.services import leads_service
+        return leads_service.add_lead(lead_data)
     service = _get_service()
     sheet_id = _extract_sheet_id(sheet_url)
     gid = _extract_gid(sheet_url)
@@ -321,6 +325,9 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
 
 def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: dict) -> dict:
     """Updates a specific row index in the Google Sheet. Clears cache."""
+    if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
+        from app.services import leads_service
+        return leads_service.update_lead(row_num, lead_data)
     service = _get_service()
     sheet_id = _extract_sheet_id(sheet_url)
     gid = _extract_gid(sheet_url)
@@ -365,6 +372,9 @@ def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: di
 
 def delete_lead_row(sheet_url: str, range_name: str, row_num: int) -> dict:
     """Deletes a specific row index in the Google Sheet by shifting subsequent rows up. Clears cache."""
+    if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
+        from app.services import leads_service
+        return leads_service.delete_lead(row_num)
     service = _get_service()
     sheet_id = _extract_sheet_id(sheet_url)
     gid = _extract_gid(sheet_url)

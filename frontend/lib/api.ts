@@ -39,4 +39,18 @@ export const api = {
     apiFetch<{ ok: boolean }>(`/api/sheets/lead/${rowNum}`, { method: "PUT", body: JSON.stringify(leadData) }),
   deleteLead: (rowNum: number) =>
     apiFetch<{ ok: boolean }>(`/api/sheets/lead/${rowNum}`, { method: "DELETE" }),
+  importLeads: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return fetch(`/api/sheets/import`, {
+      method: "POST",
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "Unknown error");
+        throw new Error(`Import error ${res.status}: ${errText}`);
+      }
+      return res.json();
+    });
+  },
 };

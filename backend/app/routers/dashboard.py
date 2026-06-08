@@ -1,6 +1,40 @@
 from fastapi import APIRouter, Header, HTTPException
 from app.services import config_service, sheets_service
 
+def format_indian_currency(val: float) -> str:
+    """Format a numeric value using the Indian Numbering System (Lakh/Crore layout)."""
+    val_rounded = round(val, 2)
+    parts = str(val_rounded).split('.')
+    int_part = parts[0]
+    dec_part = parts[1] if len(parts) > 1 else "00"
+    if len(dec_part) < 2:
+        dec_part = dec_part + "0"
+    
+    sign = ""
+    if int_part.startswith('-'):
+        sign = "-"
+        int_part = int_part[1:]
+        
+    n = len(int_part)
+    if n <= 3:
+        formatted_int = int_part
+    else:
+        last_three = int_part[-3:]
+        remaining = int_part[:-3]
+        groups = []
+        while len(remaining) > 2:
+            groups.append(remaining[-2:])
+            remaining = remaining[:-2]
+        if remaining:
+            groups.append(remaining)
+        groups.reverse()
+        formatted_int = ",".join(groups) + "," + last_three
+        
+    if val % 1 == 0:
+        return f"{sign}₹{formatted_int}"
+    else:
+        return f"{sign}₹{formatted_int}.{dec_part}"
+
 router = APIRouter()
 
 @router.get("/summary")
@@ -110,11 +144,11 @@ def get_summary(bypass_cache: bool = False):
         
         # Second KPI: Pipeline Value or Unique Companies
         if value_col:
-            kpis.append({"label": "Pipeline Value", "value": f"${total_value:,.2f}" if total_value % 1 != 0 else f"${total_value:,.0f}", "delta": "+8%"})
+            kpis.append({"label": "Pipeline Value", "value": format_indian_currency(total_value), "delta": "+8%"})
         elif company_col:
             kpis.append({"label": "Unique Companies", "value": f"{len(unique_companies):,}", "delta": "+5%"})
         else:
-            kpis.append({"label": "Pipeline Value", "value": "$0", "delta": "+0%"})
+            kpis.append({"label": "Pipeline Value", "value": "₹0", "delta": "+0%"})
             
         # Third KPI: Active Leads
         kpis.append({"label": "Active Leads", "value": f"{active_count:,}", "delta": "+4%"})
@@ -150,6 +184,16 @@ def trigger_reminders(x_cron_key: str = Header(None)):
     from app.services.alert_service import check_and_send_alerts
     try:
         sent_count = check_and_send_alerts()
+        return {"status": "success", "sent_count": sent_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.post("/trigger-daily-report")
+def trigger_daily_report():
+    """Trigger the daily metrics snapshot report email dispatch immediately for testing, bypassing daily duplicate checks."""
+    from app.services.report_service import send_daily_metrics_report
+    try:
+        sent_count = send_daily_metrics_report(bypass_duplicate_check=True)
         return {"status": "success", "sent_count": sent_count}
     except Exception as e:
         return {"status": "error", "message": str(e)}

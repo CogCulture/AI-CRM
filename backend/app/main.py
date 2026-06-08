@@ -23,28 +23,39 @@ from app.services.alert_service import check_and_send_alerts
 @app.get("/health")
 def health(): return {"status": "ok"}
 
-async def schedule_daily_alerts_check():
-    """Background task to check deadlines daily."""
+async def schedule_daily_tasks():
+    """Background task to check deadlines and send daily reports at 11:30 AM local time."""
     # Let server boot fully first (wait 10 seconds)
     await asyncio.sleep(10)
+    print("Background daily scheduler started (polls every 60 seconds)...")
     while True:
         try:
-            print("Running scheduled lead deadline alert checks...")
-            check_and_send_alerts()
+            from datetime import datetime, timedelta
+            # local time (UTC+5:30)
+            local_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
+            if local_now.hour == 11 and local_now.minute == 30:
+                print(f"Daily scheduler trigger: time is {local_now.strftime('%H:%M')} (+05:30). Processing reports and alerts...")
+                
+                # 1. Dispatch Daily Metrics Snapshot
+                from app.services.report_service import send_daily_metrics_report
+                send_daily_metrics_report()
+                
+                # 2. Dispatch approaching Deadline Alerts
+                check_and_send_alerts()
         except Exception as e:
-            print(f"Error in scheduled alerts task: {e}")
-        # Sleep for 24 hours
-        await asyncio.sleep(86400)
+            print(f"Error in scheduled daily tasks: {e}")
+        # Poll every 60 seconds
+        await asyncio.sleep(60)
 
 @app.on_event("startup")
 async def startup_event():
     import os
     run_scheduler = os.environ.get("RUN_BACKGROUND_SCHEDULER", "true").lower() == "true"
     if run_scheduler:
-        print("Starting background daily alert check loop...")
-        asyncio.create_task(schedule_daily_alerts_check())
+        print("Starting background daily task loop...")
+        asyncio.create_task(schedule_daily_tasks())
     else:
-        print("Background alert check loop disabled (Production HTTP Scheduler target mode active).")
+        print("Background task loop disabled (Production HTTP Scheduler target mode active).")
 
 @app.get("/debug-cors")
 def debug_cors():

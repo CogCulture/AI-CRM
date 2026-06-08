@@ -7,7 +7,8 @@ DEFAULT_CONFIG = {
     "sheet_range": "Sheet1",
     "visible_columns": [],      # [] = all visible
     "column_order": [],
-    "graphs": []                # [{ id, type, x_col, y_col, title }]
+    "graphs": [],                # [{ id, type, x_col, y_col, title }]
+    "report_recipients": []      # List of emails to receive daily summary at 11:30 am
 }
 
 def _path(): return settings.config_store_path
