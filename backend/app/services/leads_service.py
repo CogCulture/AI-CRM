@@ -33,7 +33,10 @@ def get_all_leads() -> dict:
     cfg = config_service.load_config()
     headers = cfg.get("headers", cfg.get("column_order", []))
     if not headers:
-        headers = ["Date", "Company", "Status", "Stage", "Deadline", "Cog POC", "POC email", "Value"]
+        headers = ["Lead ID", "Date", "Company", "Status", "Stage", "Deadline", "Cog POC", "POC email", "Value"]
+        config_service.update_config({"headers": headers})
+    elif "Lead ID" not in headers:
+        headers = ["Lead ID"] + [h for h in headers if h != "Lead ID"]
         config_service.update_config({"headers": headers})
 
     rows = []
@@ -52,6 +55,8 @@ def get_all_leads() -> dict:
                     for r in db_rows:
                         lead_data = r.get("data") or {}
                         lead_data["_row_num"] = r["id"] # Map primary key id to _row_num
+                        if not lead_data.get("Lead ID"):
+                            lead_data["Lead ID"] = f"COG-{1000 + r['id']}"
                         rows.append(lead_data)
                 else:
                     print(f"Supabase leads fetch failed ({res.status_code}): {res.text}. Falling back to SQLite.")
@@ -76,6 +81,8 @@ def get_all_leads() -> dict:
                     try:
                         lead_data = json.loads(r["data"])
                         lead_data["_row_num"] = r["id"]
+                        if not lead_data.get("Lead ID"):
+                            lead_data["Lead ID"] = f"COG-{1000 + r['id']}"
                         rows.append(lead_data)
                     except Exception:
                         pass
@@ -104,6 +111,24 @@ def get_all_leads() -> dict:
 def add_lead(lead_data: dict) -> dict:
     """Insert a new lead record into Supabase or SQLite fallback."""
     clean_data = {k: v for k, v in lead_data.items() if k not in ["id", "_row_num"]}
+    
+    # Auto-generate next Lead ID if not present
+    if not clean_data.get("Lead ID"):
+        max_num = 1000
+        try:
+            all_leads = get_all_leads()
+            for row in all_leads.get("rows", []):
+                lid = row.get("Lead ID") or ""
+                if lid.startswith("COG-"):
+                    try:
+                        num = int(lid.split("-")[1])
+                        if num > max_num:
+                            max_num = num
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        clean_data["Lead ID"] = f"COG-{max_num + 1}"
     
     if is_supabase_enabled():
         url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/leads"

@@ -100,8 +100,9 @@ const formatDisplayDate = (dateVal: any): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-// Helper to generate a unique Lead ID based on _row_num
+// Helper to retrieve or generate a unique Lead ID
 const getLeadId = (row: Record<string, any>): string => {
+  if (row["Lead ID"]) return String(row["Lead ID"]);
   const rowNum = row._row_num;
   if (!rowNum) return "—";
   return `COG-${1000 + Number(rowNum)}`;

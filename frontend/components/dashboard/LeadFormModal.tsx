@@ -192,10 +192,15 @@ export default function LeadFormModal({
                   ) : (
                     <input
                       type={hl.includes("date") || hl.includes("deadline") || hl.includes("due") ? "date" : "text"}
-                      placeholder={`Enter ${header}...`}
+                      placeholder={hl === "lead id" ? "Auto-generated" : `Enter ${header}...`}
                       value={val}
+                      disabled={hl === "lead id"}
                       onChange={(e) => handleChange(header, e.target.value)}
-                      className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none"
+                      className={`w-full px-3.5 py-2 text-xs rounded-lg font-sans outline-none border ${
+                        hl === "lead id"
+                          ? "bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500 cursor-not-allowed font-mono font-semibold"
+                          : "bg-gray-50 dark:bg-[#161622] border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 text-gray-900 dark:text-white"
+                      }`}
                     />
                   )}
                 </div>

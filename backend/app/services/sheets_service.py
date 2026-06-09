@@ -232,6 +232,9 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                     filtered_headers.append(h)
             
             headers = _deduplicate_headers(filtered_headers)
+            has_lead_id = "Lead ID" in headers
+            if not has_lead_id:
+                headers = ["Lead ID"] + headers
             
             rows = values[1:]
             normalized = []
@@ -246,7 +249,7 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                 # Fill row values, respecting hidden column indices
                 for new_idx, c_idx in enumerate(headers_indices):
                     val = row[c_idx].strip() if c_idx < len(row) else ""
-                    row_dict[headers[new_idx]] = val
+                    row_dict[headers[new_idx + (1 if not has_lead_id else 0)]] = val
                     if val != "":
                         row_has_data = True
                 
@@ -257,6 +260,11 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                     if not row_dict.get("Company") and not row_dict.get("Name") and not row_dict.get("Status"):
                         continue
                     row_dict["_row_num"] = grid_row_idx + 1
+                    
+                    # Backfill/inject Lead ID
+                    if not row_dict.get("Lead ID"):
+                        row_dict["Lead ID"] = f"COG-{1000 + row_dict['_row_num']}"
+                    
                     normalized.append(row_dict)
             data = {"headers": headers, "rows": normalized, "total": len(normalized), "is_mock": False}
             
@@ -304,6 +312,38 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
     headers = [h.strip() for h in values[0]]
     deduped_headers = _deduplicate_headers(headers)
     
+    # 2b. Auto-generate next Lead ID if not present in lead_data
+    if not lead_data.get("Lead ID"):
+        max_num = 1000
+        try:
+            all_leads_dict = fetch_sheet_data(sheet_url, range_name, bypass_cache=True)
+            for row in all_leads_dict.get("rows", []):
+                lid = row.get("Lead ID") or ""
+                if lid.startswith("COG-"):
+                    try:
+                        num = int(lid.split("-")[1])
+                        if num > max_num:
+                            max_num = num
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        lead_data["Lead ID"] = f"COG-{max_num + 1}"
+        
+    # 2c. Ensure the spreadsheet actually has a 'Lead ID' column to store it permanently
+    if "Lead ID" not in deduped_headers:
+        try:
+            updated_headers = headers + ["Lead ID"]
+            service.spreadsheets().values().update(
+                spreadsheetId=sheet_id,
+                range=f"'{final_range}'!A1",
+                valueInputOption="USER_ENTERED",
+                body={"values": [updated_headers]}
+            ).execute()
+            deduped_headers.append("Lead ID")
+        except Exception as header_err:
+            print(f"Failed to append Lead ID header to sheet: {header_err}")
+
     # 3. Format row data to match header ordering
     row_values = []
     for dh in deduped_headers:
