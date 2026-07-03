@@ -305,7 +305,7 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
     final_range = target_title if target_title else range_name
     
     # 2. Fetch headers to order cell values correctly
-    result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:Z1").execute()
+    result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:ZZ1").execute()
     values = result.get("values", [])
     if not values:
         raise ValueError("Target sheet headers could not be found.")
@@ -355,7 +355,7 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
     }
     service.spreadsheets().values().append(
         spreadsheetId=sheet_id,
-        range=f"'{final_range}'",
+        range=f"'{final_range}'!A1",
         valueInputOption="USER_ENTERED",
         body=body
     ).execute()
@@ -385,7 +385,7 @@ def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: di
         target_title = sheets[0].get("properties", {}).get("title")
     final_range = target_title if target_title else range_name
     
-    result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:Z1").execute()
+    result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:ZZ1").execute()
     values = result.get("values", [])
     if not values:
         raise ValueError("Target sheet headers could not be found.")
