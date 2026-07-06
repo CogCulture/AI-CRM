@@ -82,6 +82,14 @@ def _deduplicate_headers(headers: list) -> list:
             deduped.append(h)
     return deduped
 
+def _get_column_letter(col_num: int) -> str:
+    """Convert a 1-based column number to a Google Sheets column letter (e.g. 1 -> A, 27 -> AA)."""
+    letter = ""
+    while col_num > 0:
+        col_num, remainder = divmod(col_num - 1, 26)
+        letter = chr(65 + remainder) + letter
+    return letter
+
 def _fetch_public_csv(sheet_url: str) -> dict:
     """Fetch public sheet as CSV directly and parse."""
     import httpx
@@ -353,9 +361,10 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
     body = {
         "values": [row_values]
     }
+    last_col_letter = _get_column_letter(len(deduped_headers))
     service.spreadsheets().values().append(
         spreadsheetId=sheet_id,
-        range=f"'{final_range}'",
+        range=f"'{final_range}'!A:{last_col_letter}",
         valueInputOption="USER_ENTERED",
         body=body
     ).execute()
