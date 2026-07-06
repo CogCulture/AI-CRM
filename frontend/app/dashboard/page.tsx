@@ -310,12 +310,33 @@ function DashboardContent() {
       }));
   }, [sheetData, dateCol]);
 
-  // Filter rows by selected month
+  const isTendersTab = tab === "tenders";
+
+  // Filter rows by tab (lead type) and selected month
   const filteredRows = React.useMemo(() => {
     if (!sheetData || !sheetData.rows) return [];
-    if (selectedMonth === "All") return sheetData.rows;
     
-    return sheetData.rows.filter(row => {
+    const leadTypeCol = sheetData.headers.find(h => {
+      const hl = h.toLowerCase();
+      return hl === "lead type" || hl.includes("lead type");
+    }) || "";
+
+    let rows = sheetData.rows;
+    if (leadTypeCol) {
+      if (isTendersTab) {
+        rows = rows.filter(row => String(row[leadTypeCol] || "").trim().toLowerCase() === "tenders");
+      } else {
+        rows = rows.filter(row => String(row[leadTypeCol] || "").trim().toLowerCase() !== "tenders");
+      }
+    } else {
+      if (isTendersTab) {
+        rows = [];
+      }
+    }
+
+    if (selectedMonth === "All") return rows;
+    
+    return rows.filter(row => {
       const dateVal = row[dateCol];
       if (!dateVal) return false;
       const parts = String(dateVal).trim().split(/[-/.]/);
@@ -336,7 +357,7 @@ function DashboardContent() {
       }
       return false;
     });
-  }, [sheetData, selectedMonth, dateCol]);
+  }, [sheetData, selectedMonth, dateCol, isTendersTab]);
 
   const filteredSheetData = React.useMemo<SheetData | null>(() => {
     if (!sheetData) return null;
@@ -486,8 +507,8 @@ function DashboardContent() {
     return hl.includes("deadline") || hl.includes("due");
   }) || "";
 
-  const dueTodayLeads = sheetData && deadlineHeader
-    ? sheetData.rows.filter(row => isToday(row[deadlineHeader]))
+  const dueTodayLeads = deadlineHeader
+    ? filteredRows.filter(row => isToday(row[deadlineHeader]))
     : [];
 
   if (loading) {
@@ -569,7 +590,7 @@ function DashboardContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="font-sans text-2xl text-gray-900 dark:text-white font-bold tracking-tight">
-                Dashboard
+                {isTendersTab ? "Tenders" : "Dashboard"}
               </h1>
               
               {sheetData && uniqueMonths.length > 0 && (
@@ -708,7 +729,7 @@ function DashboardContent() {
                   <GraphWidget
                     key={g.id}
                     graph={g}
-                    rows={sheetData.rows}
+                    rows={filteredRows}
                     onDelete={handleDeleteGraph}
                     height={200}
                   />
@@ -723,7 +744,7 @@ function DashboardContent() {
               isOpen={isBuilderOpen}
               onClose={() => setIsBuilderOpen(false)}
               headers={sheetData.headers}
-              rows={sheetData.rows}
+              rows={filteredRows}
               onSave={handleAddGraph}
             />
           )}

@@ -1,6 +1,8 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, 
   TrendingUp, 
@@ -20,12 +22,29 @@ interface DashboardShellProps {
 
 // Check if email domain is a public/personal email provider
 function isWorkEmail(email: string): boolean {
-  return true; // Bypass work-email restriction to allow personal Google accounts
+  if (!email) return false;
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return false;
+  const publicDomains = [
+    "gmail.com",
+    "yahoo.com",
+    "hotmail.com",
+    "outlook.com",
+    "live.com",
+    "aol.com",
+    "icloud.com",
+    "mail.com",
+    "gmx.com",
+    "yandex.com"
+  ];
+  return !publicDomains.includes(domain);
 }
 
 export default function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab") || "dashboard";
   const [user, setUser] = useState<{ name: string; email: string; picture: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -56,6 +75,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Tenders", href: "/dashboard?tab=tenders", icon: TrendingUp },
     { name: "Data Platform", href: "/dashboard?tab=data", icon: Database },
   ];
 
@@ -112,7 +132,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           {/* Nav Items */}
           <nav className="px-3 py-2 space-y-1">
             {navigation.map((item) => {
-              const isActive = pathname === "/dashboard" && item.name === "Dashboard";
+              const targetTab = item.href.includes("tab=") ? item.href.split("tab=")[1] : "dashboard";
+              const isActive = pathname === "/dashboard" && currentTab === targetTab;
               const Icon = item.icon;
               return (
                 <Link
