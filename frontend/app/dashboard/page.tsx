@@ -324,9 +324,15 @@ function DashboardContent() {
     let rows = sheetData.rows;
     if (leadTypeCol) {
       if (isTendersTab) {
-        rows = rows.filter(row => String(row[leadTypeCol] || "").trim().toLowerCase() === "tenders");
+        rows = rows.filter(row => {
+          const val = String(row[leadTypeCol] || "").trim().toLowerCase();
+          return val === "tender" || val === "tenders" || val.includes("tender");
+        });
       } else {
-        rows = rows.filter(row => String(row[leadTypeCol] || "").trim().toLowerCase() !== "tenders");
+        rows = rows.filter(row => {
+          const val = String(row[leadTypeCol] || "").trim().toLowerCase();
+          return val !== "tender" && val !== "tenders" && !val.includes("tender");
+        });
       }
     } else {
       if (isTendersTab) {
