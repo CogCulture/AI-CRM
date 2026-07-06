@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import DashboardShell from "../../components/dashboard/DashboardShell";
 import { User, Bell, Sliders, Shield, Palette } from "lucide-react";
 import { toast } from "sonner";
@@ -38,7 +38,12 @@ export default function SettingsPage() {
   };
 
   return (
-    <DashboardShell>
+    <Suspense fallback={
+      <div className="flex h-screen w-screen items-center justify-center bg-[#0A0A0F] text-white">
+        <div className="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Loading Settings...</div>
+      </div>
+    }>
+      <DashboardShell>
       <div className="space-y-8 max-w-3xl mx-auto animate-row-reveal">
         {/* Title */}
         <div>
@@ -148,5 +153,6 @@ export default function SettingsPage() {
         </div>
       </div>
     </DashboardShell>
+    </Suspense>
   );
 }
