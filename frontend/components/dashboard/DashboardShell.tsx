@@ -20,22 +20,7 @@ interface DashboardShellProps {
 
 // Check if email domain is a public/personal email provider
 function isWorkEmail(email: string): boolean {
-  if (!email) return false;
-  const domain = email.split("@")[1]?.toLowerCase();
-  if (!domain) return false;
-  const publicDomains = [
-    "gmail.com",
-    "yahoo.com",
-    "hotmail.com",
-    "outlook.com",
-    "live.com",
-    "aol.com",
-    "icloud.com",
-    "mail.com",
-    "gmx.com",
-    "yandex.com"
-  ];
-  return !publicDomains.includes(domain);
+  return true; // Bypass work-email restriction to allow personal Google accounts
 }
 
 export default function DashboardShell({ children }: DashboardShellProps) {
