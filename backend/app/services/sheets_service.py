@@ -148,6 +148,9 @@ def _fetch_public_csv(sheet_url: str) -> dict:
             # Exclude section headers (like 'SEPTEMBER LEADS') where only the Date field has data
             if len(non_empty_cols) == 1 and "date" in non_empty_cols[0].lower():
                 continue
+            # Also exclude rows that don't have basic company/name/status data
+            if not row_dict.get("Company") and not row_dict.get("Name") and not row_dict.get("Status"):
+                continue
             
             # Store the 1-indexed Excel row number
             row_dict["_row_num"] = idx + 2
@@ -252,18 +255,17 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                 row_dict = {}
                 row_has_data = False
                 # Fill row values, respecting hidden column indices
-                # Use filtered_headers (the actual column names from the sheet, without
-                # any injected "Lead ID") so values are always mapped to the correct key.
                 for new_idx, c_idx in enumerate(headers_indices):
                     val = row[c_idx].strip() if c_idx < len(row) else ""
-                    row_dict[filtered_headers[new_idx]] = val
+                    row_dict[headers[new_idx + (1 if not has_lead_id else 0)]] = val
                     if val != "":
                         row_has_data = True
                 
                 if row_has_data:
                     non_empty_cols = [k for k, v in row_dict.items() if v != ""]
-                    # Skip single-cell section divider rows (e.g. "SEPTEMBER LEADS" in a date col)
                     if len(non_empty_cols) == 1 and "date" in non_empty_cols[0].lower():
+                        continue
+                    if not row_dict.get("Company") and not row_dict.get("Name") and not row_dict.get("Status"):
                         continue
                     row_dict["_row_num"] = grid_row_idx + 1
                     
