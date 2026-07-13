@@ -81,6 +81,7 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
   let hotRevenue = 0;
   let warmRevenue = 0;
   let coldRevenue = 0;
+  let discoveryRevenue = 0;
   const monthlyDataMap: Record<string, { won: number; lost: number }> = {};
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -103,14 +104,17 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
         lostRevenue += revVal;
       }
 
-      // Classify hot, warm, cold
+      // Classify hot, warm, cold, discovery
       const isHot = statusVal === "hot" || isWon;
       const isCold = statusVal === "cold" || statusVal === "dead lead" || statusVal === "dead" || isLost;
+      const isDiscovery = statusVal === "discovery";
 
       if (isHot) {
         hotRevenue += revVal;
       } else if (isCold) {
         coldRevenue += revVal;
+      } else if (isDiscovery) {
+        discoveryRevenue += revVal;
       } else {
         warmRevenue += revVal;
       }
@@ -148,10 +152,11 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
   if (isMock) {
     wonRevenue = MOCK_REVENUE_DATA.reduce((acc, curr) => acc + curr["Won Revenue"], 0);
     lostRevenue = MOCK_REVENUE_DATA.reduce((acc, curr) => acc + curr["Lost Revenue"], 0);
-    totalEstimatedRevenue = wonRevenue + lostRevenue + 150000;
+    totalEstimatedRevenue = wonRevenue + lostRevenue + 190000;
     hotRevenue = wonRevenue + 50000;
     coldRevenue = lostRevenue + 30000;
-    warmRevenue = totalEstimatedRevenue - hotRevenue - coldRevenue;
+    discoveryRevenue = 40000;
+    warmRevenue = totalEstimatedRevenue - hotRevenue - coldRevenue - discoveryRevenue;
   }
 
   const formatCurrency = (val: number) => {
@@ -269,6 +274,29 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
             <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
               <span>Share of pipeline</span>
               <span>{totalEstimatedRevenue > 0 ? ((coldRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+            </div>
+          </div>
+
+          {/* Discovery leads row */}
+          <div className="p-3 rounded-xl border border-sky-150/50 dark:border-sky-500/10 bg-sky-50/20 dark:bg-sky-500/5 flex flex-col gap-1.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Discovery Leads</span>
+              </div>
+              <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
+                {formatCurrency(discoveryRevenue)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-sky-500 h-full rounded-full transition-all duration-500" 
+                style={{ width: `${totalEstimatedRevenue > 0 ? (discoveryRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
+              <span>Share of pipeline</span>
+              <span>{totalEstimatedRevenue > 0 ? ((discoveryRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
             </div>
           </div>
         </div>

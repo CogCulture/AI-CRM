@@ -30,6 +30,7 @@ def send_daily_metrics_report(bypass_duplicate_check: bool = False) -> int:
     hot_count = 0
     warm_count = 0
     cold_count = 0
+    discovery_count = 0
     status_col_found = False
     try:
         data = sheets_service.fetch_sheet_data(sheet_url or "mock", range_name, bypass_cache=True)
@@ -46,6 +47,8 @@ def send_daily_metrics_report(bypass_duplicate_check: bool = False) -> int:
                     warm_count += 1
                 elif "cold" in val:
                     cold_count += 1
+                elif "discovery" in val:
+                    discovery_count += 1
     except Exception as e:
         print(f"Failed to fetch status counts for report: {e}")
 
@@ -104,6 +107,11 @@ def send_daily_metrics_report(bypass_duplicate_check: bool = False) -> int:
             <div style="display: inline-block; margin: 6px; vertical-align: top;">
                 <div style="background-color: #dbeafe; color: #2563eb; border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: bold; border: 1px solid #bfdbfe; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; white-space: nowrap;">
                     ❄️ Cold Leads: {cold_count}
+                </div>
+            </div>
+            <div style="display: inline-block; margin: 6px; vertical-align: top;">
+                <div style="background-color: #e0f2fe; color: #0369a1; border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: bold; border: 1px solid #bae6fd; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; white-space: nowrap;">
+                    🔍 Discovery Leads: {discovery_count}
                 </div>
             </div>
         </div>
