@@ -145,11 +145,11 @@ def _fetch_public_csv(sheet_url: str) -> dict:
         
         if row_has_data:
             non_empty_cols = [k for k, v in row_dict.items() if v != ""]
-            # Exclude section headers (like 'SEPTEMBER LEADS') where only the Date field has data
-            if len(non_empty_cols) == 1 and "date" in non_empty_cols[0].lower():
+            # Exclude single-cell section header divider rows (e.g. 'OCTOBER LEADS (GOOGLE ADS)')
+            if len(non_empty_cols) == 1:
                 continue
-            # Also exclude rows that don't have basic company/name/status data
-            if not row_dict.get("Company") and not row_dict.get("Name") and not row_dict.get("Status"):
+            # Require at least 2 non-empty columns to be considered a real data row
+            if len(non_empty_cols) < 2:
                 continue
             
             # Store the 1-indexed Excel row number
@@ -263,9 +263,11 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                 
                 if row_has_data:
                     non_empty_cols = [k for k, v in row_dict.items() if v != ""]
-                    if len(non_empty_cols) == 1 and "date" in non_empty_cols[0].lower():
+                    # Exclude single-cell section header divider rows (e.g. 'OCTOBER LEADS (GOOGLE ADS)')
+                    if len(non_empty_cols) == 1:
                         continue
-                    if not row_dict.get("Company") and not row_dict.get("Name") and not row_dict.get("Status"):
+                    # Require at least 2 non-empty columns to be a real data row
+                    if len(non_empty_cols) < 2:
                         continue
                     row_dict["_row_num"] = grid_row_idx + 1
                     
