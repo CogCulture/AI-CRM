@@ -87,8 +87,20 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
 
   if (!isMock && sheetData.rows && revenueHeader) {
     sheetData.rows.forEach(row => {
-      const revStr = String(row[revenueHeader] || "0");
-      const revVal = parseFloat(revStr.replace(/[^0-9.-]/g, "")) || 0;
+      let revVal = 0;
+      if (revenueHeader && row[revenueHeader] !== undefined && row[revenueHeader] !== "") {
+        const revStr = String(row[revenueHeader]);
+        revVal = parseFloat(revStr.replace(/[^0-9.-]/g, "")) || 0;
+      } else {
+        for (const [k, v] of Object.entries(row)) {
+          const kl = k.toLowerCase();
+          if (kl.includes("revenue") || kl.includes("estimation") || kl.includes("value") || kl.includes("amount")) {
+            const revStr = String(v || "");
+            revVal = parseFloat(revStr.replace(/[^0-9.-]/g, "")) || 0;
+            if (revVal > 0) break;
+          }
+        }
+      }
       
       totalEstimatedRevenue += revVal;
 
