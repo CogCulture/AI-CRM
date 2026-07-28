@@ -105,8 +105,8 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
       }
 
       // Classify hot, warm, cold, discovery
-      const isHot = statusVal === "hot" || isWon;
-      const isCold = statusVal === "cold" || statusVal === "dead lead" || statusVal === "dead" || isLost;
+      const isHot = statusVal === "hot";
+      const isCold = statusVal === "cold" || statusVal === "dead lead" || statusVal === "dead";
       const isDiscovery = statusVal === "discovery";
 
       if (isHot) {
