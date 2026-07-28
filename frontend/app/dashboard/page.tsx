@@ -322,22 +322,30 @@ function DashboardContent() {
     }) || "";
 
     let rows = sheetData.rows;
-    if (leadTypeCol) {
-      if (isTendersTab) {
-        rows = rows.filter(row => {
-          const val = String(row[leadTypeCol] || "").trim().toLowerCase();
-          return val === "tender" || val === "tenders" || val.includes("tender");
-        });
-      } else {
-        rows = rows.filter(row => {
-          const val = String(row[leadTypeCol] || "").trim().toLowerCase();
-          return val !== "tender" && val !== "tenders" && !val.includes("tender");
-        });
-      }
+    if (isTendersTab) {
+      rows = rows.filter(row => {
+        for (const [k, v] of Object.entries(row)) {
+          if (k.toLowerCase().includes("lead type") || k.toLowerCase().includes("type")) {
+            const val = String(v || "").trim().toLowerCase();
+            if (val === "tender" || val === "tenders" || val.includes("tender")) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
     } else {
-      if (isTendersTab) {
-        rows = [];
-      }
+      rows = rows.filter(row => {
+        for (const [k, v] of Object.entries(row)) {
+          if (k.toLowerCase().includes("lead type") || k.toLowerCase().includes("type")) {
+            const val = String(v || "").trim().toLowerCase();
+            if (val === "tender" || val === "tenders" || val.includes("tender")) {
+              return false;
+            }
+          }
+        }
+        return true;
+      });
     }
 
     if (selectedMonth === "All") return rows;
