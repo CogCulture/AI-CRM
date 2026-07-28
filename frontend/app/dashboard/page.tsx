@@ -438,6 +438,7 @@ function DashboardContent() {
 
     let activeCount = 0;
     let closedWonCount = 0;
+    let coldCount = 0;
     const statusColName = sheetData.headers.find(h => h.toLowerCase() === "status" || h.toLowerCase().includes("status")) || "";
     const stageColName = sheetData.headers.find(h => h.toLowerCase().includes("stage")) || "";
 
@@ -469,13 +470,16 @@ function DashboardContent() {
 
       if (isWon) {
         closedWonCount++;
-      } else if (isActive && !isCold) {
+      } else if (isCold) {
+        coldCount++;
+      } else if (isActive) {
         activeCount++;
       }
     });
 
     kpisList.push({ label: "Active Leads", value: activeCount.toLocaleString("en-IN"), delta: "+4%" });
     kpisList.push({ label: "Closed Won", value: closedWonCount.toLocaleString("en-IN"), delta: "+0%" });
+    kpisList.push({ label: "Cold Leads", value: coldCount.toLocaleString("en-IN"), delta: "+0%" });
 
     return kpisList;
   }, [filteredRows, sheetData, valCol]);
@@ -661,9 +665,9 @@ function DashboardContent() {
               )}
             </div>
           </div>
-          {/* Row 1: 4 Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, index) => {
+          {/* Row 1: Top Metric KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            {Array.from({ length: 5 }).map((_, index) => {
               const kpi = displayKpis[index];
 
               if (kpi) {
@@ -678,7 +682,7 @@ function DashboardContent() {
                 );
               } else {
                 return (
-                  <div key={index} className="h-full min-h-[110px] flex items-center justify-center text-xs text-gray-400 dark:text-[#555566] font-mono border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] rounded-2xl shadow-sm">
+                  <div key={index} className="h-full min-h-[100px] flex items-center justify-center text-xs text-gray-400 dark:text-[#555566] font-mono border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] rounded-2xl shadow-sm">
                     Empty Slot
                   </div>
                 );
