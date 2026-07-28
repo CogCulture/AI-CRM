@@ -92,7 +92,21 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
       
       totalEstimatedRevenue += revVal;
 
-      const statusVal = String(row[statusHeader] || "").toLowerCase().trim();
+      // Safely resolve status value across potential duplicate 'Status' headers
+      let statusVal = "";
+      for (const key of Object.keys(row)) {
+        if (key.toLowerCase().includes("status")) {
+          const val = String(row[key] || "").toLowerCase().trim();
+          if (["hot", "warm", "cold", "discovery", "dead"].includes(val)) {
+            statusVal = val;
+            break;
+          }
+        }
+      }
+      if (!statusVal) {
+        statusVal = String(row[statusHeader] || "").toLowerCase().trim();
+      }
+
       const stageVal = String(row[stageHeader] || "").toLowerCase().trim();
 
       const isWon = ["won", "closed won", "converted", "completed", "hired", "success"].some(x => statusVal.includes(x) || stageVal.includes(x));
