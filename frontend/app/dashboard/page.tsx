@@ -325,7 +325,8 @@ function DashboardContent() {
     if (isTendersTab) {
       rows = rows.filter(row => {
         for (const [k, v] of Object.entries(row)) {
-          if (k.toLowerCase().includes("lead type") || k.toLowerCase().includes("type")) {
+          const keyLower = k.toLowerCase();
+          if (keyLower.includes("lead type") || keyLower.includes("type") || keyLower.includes("source") || keyLower.includes("category")) {
             const val = String(v || "").trim().toLowerCase();
             if (val === "tender" || val === "tenders" || val.includes("tender")) {
               return true;
@@ -337,7 +338,8 @@ function DashboardContent() {
     } else {
       rows = rows.filter(row => {
         for (const [k, v] of Object.entries(row)) {
-          if (k.toLowerCase().includes("lead type") || k.toLowerCase().includes("type")) {
+          const keyLower = k.toLowerCase();
+          if (keyLower.includes("lead type") || keyLower.includes("type") || keyLower.includes("source") || keyLower.includes("category")) {
             const val = String(v || "").trim().toLowerCase();
             if (val === "tender" || val === "tenders" || val.includes("tender")) {
               return false;
