@@ -16,7 +16,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  getSheetData: (bypassCache = false) => apiFetch<SheetData>(`/api/sheets/data${bypassCache ? "?bypass_cache=true" : ""}`),
+  getSheetData: (bypassCache = false, sheetRange?: string) => {
+    const params = new URLSearchParams();
+    if (bypassCache) params.set("bypass_cache", "true");
+    if (sheetRange) params.set("sheet_range", sheetRange);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<SheetData>(`/api/sheets/data${query}`);
+  },
   getDashboardSummary: (bypassCache = false) => apiFetch<DashboardSummary>(`/api/dashboard/summary${bypassCache ? "?bypass_cache=true" : ""}`),
   getConfig: () => apiFetch<Config>("/api/config/"),
   updateConfig: (b: Partial<Config>) =>

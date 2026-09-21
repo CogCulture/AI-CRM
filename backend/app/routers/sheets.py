@@ -18,10 +18,10 @@ def _get_token_path():
     return os.path.join(base_dir, "token.json")
 
 @router.get("/data")
-def get_sheet_data(bypass_cache: bool = False):
+def get_sheet_data(bypass_cache: bool = False, sheet_range: Optional[str] = None):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
-    range_name = cfg.get("sheet_range", "Sheet1")
+    range_name = sheet_range or cfg.get("sheet_range", "Active Leads")
     
     # If not configured, we fetch mock data and flag configured as False
     is_configured = bool(sheet_url)
@@ -56,7 +56,7 @@ def oauth_auth(redirect_url: str = "http://localhost:3001/admin"):
             "email",
             "profile"
         ],
-        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/sheets/callback")
+        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", f"http://localhost:{os.environ.get('PORT', '8000')}/api/sheets/callback")
     )
     
     authorization_url, state = flow.authorization_url(
@@ -91,7 +91,7 @@ def oauth_callback(code: str, state: str):
             "email",
             "profile"
         ],
-        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/sheets/callback")
+        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", f"http://localhost:{os.environ.get('PORT', '8000')}/api/sheets/callback")
     )
     
     try:
@@ -200,10 +200,10 @@ def auth_status(user_session: Optional[str] = Cookie(None)):
         return {"authenticated": False}
 
 @router.post("/lead")
-def add_lead(body: dict):
+def add_lead(body: dict, sheet_range: Optional[str] = None):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
-    range_name = cfg.get("sheet_range", "Sheet1")
+    range_name = sheet_range or cfg.get("sheet_range", "Active Leads")
     try:
         res = sheets_service.append_lead_row(sheet_url, range_name, body)
         return res
@@ -211,10 +211,10 @@ def add_lead(body: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/lead/{row_num}")
-def update_lead(row_num: int, body: dict):
+def update_lead(row_num: int, body: dict, sheet_range: Optional[str] = None):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
-    range_name = cfg.get("sheet_range", "Sheet1")
+    range_name = sheet_range or cfg.get("sheet_range", "Active Leads")
     try:
         res = sheets_service.update_lead_row(sheet_url, range_name, row_num, body)
         return res
@@ -222,10 +222,10 @@ def update_lead(row_num: int, body: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/lead/{row_num}")
-def delete_lead(row_num: int):
+def delete_lead(row_num: int, sheet_range: Optional[str] = None):
     cfg = config_service.load_config()
     sheet_url = cfg.get("sheet_url")
-    range_name = cfg.get("sheet_range", "Sheet1")
+    range_name = sheet_range or cfg.get("sheet_range", "Active Leads")
     try:
         res = sheets_service.delete_lead_row(sheet_url, range_name, row_num)
         return res

@@ -108,6 +108,95 @@ const getLeadId = (row: Record<string, any>): string => {
   return `COG-${1000 + Number(rowNum)}`;
 };
 
+// Helper to retrieve row source value
+const getRowSource = (row: Record<string, any>): string => {
+  for (const [k, v] of Object.entries(row)) {
+    const kLower = k.toLowerCase().trim();
+    if (kLower === "source" || kLower === "sources" || kLower.includes("source") || kLower.includes("lead source")) {
+      const val = String(v || "").trim();
+      if (val) return val;
+    }
+  }
+  return "";
+};
+
+// Helper to assign distinct, soft, eye-friendly high-contrast pastel colors based on source across the row
+const getSourceRowClasses = (sourceStr: string): string => {
+  const norm = sourceStr.toLowerCase().trim();
+  if (!norm) return "bg-white dark:bg-[#111118] hover:bg-gray-50/80 dark:hover:bg-[rgba(255,255,255,0.03)]";
+  
+  // 1. Internal -> Slate / Gray (#F1F5F9, #334155)
+  if (norm.includes("internal")) {
+    return "bg-[#F1F5F9] dark:bg-[#1E293B]/90 text-[#334155] dark:text-[#CBD5E1] hover:bg-[#E2E8F0] dark:hover:bg-[#334155] border-l-4 border-l-[#64748B] font-medium";
+  }
+  // 2. LinkedIn -> Blue (#DBEAFE, #1D4ED8)
+  if (norm.includes("linkedin")) {
+    return "bg-[#DBEAFE] dark:bg-[#1E3A8A]/90 text-[#1D4ED8] dark:text-[#BFDBFE] hover:bg-[#BFDBFE] dark:hover:bg-[#1E40AF] border-l-4 border-l-[#2563EB] font-medium";
+  }
+  // 3. Website -> Green (#DCFCE7, #15803D)
+  if (norm.includes("website") || norm.includes("web")) {
+    return "bg-[#DCFCE7] dark:bg-[#14532D]/90 text-[#15803D] dark:text-[#BBF7D0] hover:bg-[#BBF7D0] dark:hover:bg-[#166534] border-l-4 border-l-[#16A34A] font-medium";
+  }
+  // 4. Inbound -> Purple (#F3E8FF, #7E22CE)
+  if (norm.includes("inbound")) {
+    return "bg-[#F3E8FF] dark:bg-[#581C87]/90 text-[#7E22CE] dark:text-[#E9D5FF] hover:bg-[#E9D5FF] dark:hover:bg-[#6B21A8] border-l-4 border-l-[#9333EA] font-medium";
+  }
+  // 5. Direct Mail / Mail -> Rose (#FFE4E6, #BE123C)
+  if (norm.includes("direct mail") || norm.includes("mail")) {
+    return "bg-[#FFE4E6] dark:bg-[#881337]/90 text-[#BE123C] dark:text-[#FECDD3] hover:bg-[#FECDD3] dark:hover:bg-[#9F1239] border-l-4 border-l-[#E11D48] font-medium";
+  }
+  // 6. Direct -> Orange (#FFEDD5, #C2410C)
+  if (norm.includes("direct")) {
+    return "bg-[#FFEDD5] dark:bg-[#7C2D12]/90 text-[#C2410C] dark:text-[#FED7AA] hover:bg-[#FED7AA] dark:hover:bg-[#9A3412] border-l-4 border-l-[#EA580C] font-medium";
+  }
+  // 7. Tender -> Warm Gold / Amber (#FEF3C7, #78350F)
+  if (norm.includes("tender")) {
+    return "bg-[#FEF3C7] dark:bg-[#78350F]/90 text-[#78350F] dark:text-[#FDE68A] hover:bg-[#FDE68A] dark:hover:bg-[#92400E] border-l-4 border-l-[#D97706] font-medium";
+  }
+
+  // Dynamic hash fallback for custom sources
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) {
+    hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colorIndex = Math.abs(hash) % 5;
+  const colorClasses = [
+    "bg-[#ECFCCB] dark:bg-[#1B2909]/90 text-[#365314] dark:text-[#D9F99D] hover:bg-[#D9F99D] border-l-4 border-l-[#65A30D] font-medium",
+    "bg-[#CFFAFE] dark:bg-[#082B30]/90 text-[#164E63] dark:text-[#A5F3FC] hover:bg-[#A5F3FC] border-l-4 border-l-[#0891B2] font-medium",
+    "bg-[#FAE8FF] dark:bg-[#340A31]/90 text-[#701A75] dark:text-[#F5D0FE] hover:bg-[#F5D0FE] border-l-4 border-l-[#C026D3] font-medium",
+    "bg-[#FEF9C3] dark:bg-[#322D08]/90 text-[#713F12] dark:text-[#FEF08A] hover:bg-[#FEF08A] border-l-4 border-l-[#CA8A04] font-medium",
+    "bg-[#EDE9FE] dark:bg-[#201548]/90 text-[#4C1D95] dark:text-[#DDD6FE] hover:bg-[#DDD6FE] border-l-4 border-l-[#7C3AED] font-medium",
+  ];
+  return colorClasses[colorIndex];
+};
+
+// Helper to retrieve color block styling for the Source Legend bar
+const getLegendColor = (sourceStr: string) => {
+  const norm = sourceStr.toLowerCase().trim();
+  if (norm.includes("internal")) {
+    return { name: sourceStr, dot: "bg-[#64748B]", pill: "bg-[#F1F5F9] dark:bg-[#1E293B]/90 text-[#334155] dark:text-[#CBD5E1] border-[#E2E8F0] dark:border-[#64748B]/40" };
+  }
+  if (norm.includes("linkedin")) {
+    return { name: sourceStr, dot: "bg-[#2563EB]", pill: "bg-[#DBEAFE] dark:bg-[#1E3A8A]/90 text-[#1D4ED8] dark:text-[#BFDBFE] border-[#BFDBFE] dark:border-[#2563EB]/40" };
+  }
+  if (norm.includes("website") || norm.includes("web")) {
+    return { name: sourceStr, dot: "bg-[#16A34A]", pill: "bg-[#DCFCE7] dark:bg-[#14532D]/90 text-[#15803D] dark:text-[#BBF7D0] border-[#BBF7D0] dark:border-[#16A34A]/40" };
+  }
+  if (norm.includes("inbound")) {
+    return { name: sourceStr, dot: "bg-[#9333EA]", pill: "bg-[#F3E8FF] dark:bg-[#581C87]/90 text-[#7E22CE] dark:text-[#E9D5FF] border-[#E9D5FF] dark:border-[#9333EA]/40" };
+  }
+  if (norm.includes("direct mail") || norm.includes("mail")) {
+    return { name: sourceStr, dot: "bg-[#E11D48]", pill: "bg-[#FFE4E6] dark:bg-[#881337]/90 text-[#BE123C] dark:text-[#FECDD3] border-[#FECDD3] dark:border-[#E11D48]/40" };
+  }
+  if (norm.includes("direct")) {
+    return { name: sourceStr, dot: "bg-[#EA580C]", pill: "bg-[#FFEDD5] dark:bg-[#7C2D12]/90 text-[#C2410C] dark:text-[#FED7AA] border-[#FED7AA] dark:border-[#EA580C]/40" };
+  }
+  if (norm.includes("tender")) {
+    return { name: sourceStr, dot: "bg-[#D97706]", pill: "bg-[#FEF3C7] dark:bg-[#78350F]/90 text-[#78350F] dark:text-[#FDE68A] border-[#FDE68A] dark:border-[#D97706]/40" };
+  }
+  return { name: sourceStr, dot: "bg-[#0284C7]", pill: "bg-sky-50 dark:bg-sky-950/80 text-sky-900 dark:text-sky-200 border-sky-200 dark:border-sky-800/40" };
+};
+
 export default function CRMTable({
   headers,
   rows,
@@ -232,15 +321,46 @@ export default function CRMTable({
   const currentRows = sortedRows.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(sortedRows.length / rowsPerPage);
 
+  const sourceColumn = headers.find(h => {
+    const hl = h.toLowerCase().trim();
+    return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
+  });
+  const activeSources = sourceColumn
+    ? Array.from(new Set(rows.map(r => String(r[sourceColumn] || "").trim()).filter(Boolean)))
+    : ["Internal", "Tender", "Website", "Linkedin", "Inbound"];
+
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] overflow-hidden shadow-xl transition-colors duration-150">
       {/* Table Action Bar */}
-      <div className="px-5 py-5 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex flex-col items-end gap-3.5">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white font-sans tracking-tight">
-          Campaign Performance
-        </h3>
-        
-        <div className="flex items-center gap-3 w-full justify-end flex-wrap">
+      <div className="px-5 py-4 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Left: Section Title & Soothing Source Color Palette Legend */}
+        <div className="flex flex-col gap-2 min-w-0">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white font-sans tracking-tight">
+            Campaign Performance
+          </h3>
+          
+          {/* Soothing Source Palette Legend Blocks */}
+          <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899] mr-1">
+              Source Palette:
+            </span>
+            {activeSources.map(src => {
+              const item = getLegendColor(src);
+              return (
+                <div
+                  key={src}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border transition-all shadow-xs ${item.pill}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${item.dot} shadow-xs shrink-0`} />
+                  <span>{src}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: Controls & Filters */}
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
           {/* Type Filter */}
           {typeColumn && (
             <div className="relative">
@@ -403,12 +523,15 @@ export default function CRMTable({
           </thead>
           <tbody>
             {currentRows.length > 0 ? (
-              currentRows.map((row, rowIdx) => (
-                <tr 
-                  key={rowIdx}
-                  className="border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50/30 dark:hover:bg-[rgba(255,255,255,0.02)] transition-colors duration-150 text-xs font-sans text-gray-900 dark:text-gray-100 row-fade-in"
-                  style={{ animationDelay: `${rowIdx * 30}ms` }}
-                >
+              currentRows.map((row, rowIdx) => {
+                const rowSource = getRowSource(row);
+                const rowClass = getSourceRowClasses(rowSource);
+                return (
+                  <tr 
+                    key={rowIdx}
+                    className={`border-b border-gray-200/60 dark:border-white/5 last:border-0 transition-colors duration-150 text-xs font-sans text-gray-900 dark:text-gray-100 row-fade-in ${rowClass}`}
+                    style={{ animationDelay: `${rowIdx * 30}ms` }}
+                  >
                   {activeCols.map((col, idx) => {
                     const cellVal = col === "Lead ID" ? getLeadId(row) : String(row[col] || "");
                     const isNo = col.toLowerCase() === "no.";
@@ -461,12 +584,21 @@ export default function CRMTable({
                       const isStatus = colLower.includes("status");
                       const isStage = colLower.includes("stage");
                       const isType = colLower.includes("type");
+                      const isSource = colLower.includes("source");
                       const isDate = colLower.includes("date") || colLower.includes("deadline") || colLower.includes("due");
 
                       if (isDate && cellVal.trim() !== "") {
                         return (
                           <span className="font-mono text-gray-700 dark:text-[#dedee5]">
                             {formatDisplayDate(cellVal)}
+                          </span>
+                        );
+                      }
+
+                      if (isSource && cellVal.trim() !== "" && cellVal.length <= 25) {
+                        return (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-white/80 dark:bg-black/40 border border-black/15 dark:border-white/20 shadow-xs">
+                            {cellVal}
                           </span>
                         );
                       }
@@ -568,7 +700,8 @@ export default function CRMTable({
                     </td>
                   )}
                 </tr>
-              ))
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={(activeCols.length + ((onEdit || onDelete) ? 1 : 0)) || 1} className="py-12 text-center text-[#555566] text-sm font-sans">

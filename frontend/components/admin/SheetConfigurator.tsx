@@ -44,7 +44,9 @@ export default function SheetConfigurator() {
 
   // Google Sheets Inputs
   const [urlInput, setUrlInput] = useState("");
-  const [rangeInput, setRangeInput] = useState("Sheet1");
+  const [rangeInput, setRangeInput] = useState("Active Leads");
+  const [tabsList, setTabsList] = useState<string[]>(["Active Leads", "Internal Leads"]);
+  const [newTabInput, setNewTabInput] = useState("");
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -112,6 +114,26 @@ export default function SheetConfigurator() {
     }
   };
 
+  const handleAddTab = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const tabName = newTabInput.trim();
+    if (!tabName) return;
+    if (tabsList.includes(tabName)) {
+      toast.error(`Tab "${tabName}" is already added`);
+      return;
+    }
+    const updated = [...tabsList, tabName];
+    setTabsList(updated);
+    setNewTabInput("");
+    toast.success(`Added tab "${tabName}"`);
+  };
+
+  const handleRemoveTab = (tabName: string) => {
+    const updated = tabsList.filter(t => t !== tabName);
+    setTabsList(updated);
+    toast.info(`Removed tab "${tabName}"`);
+  };
+
   // Load configuration and status
   const loadStatus = async () => {
     try {
@@ -121,7 +143,8 @@ export default function SheetConfigurator() {
       const isSheetsMode = cfg.sheet_url && cfg.sheet_url !== "mock" && cfg.sheet_url !== "local_db";
       setActiveTab(isSheetsMode ? "sheets" : "local");
       setUrlInput(isSheetsMode ? cfg.sheet_url : "");
-      setRangeInput(cfg.sheet_range || "Sheet1");
+      setRangeInput(cfg.sheet_range || "Active Leads");
+      setTabsList(cfg.sheet_tabs && cfg.sheet_tabs.length > 0 ? cfg.sheet_tabs : ["Active Leads", "Internal Leads"]);
 
       const data = await api.getSheetData(true);
       setDbStatus({
@@ -238,7 +261,8 @@ export default function SheetConfigurator() {
     try {
       await api.updateConfig({
         sheet_url: urlInput.trim(),
-        sheet_range: rangeInput.trim()
+        sheet_range: rangeInput.trim(),
+        sheet_tabs: tabsList
       });
       toast.success("Google Sheets configuration saved and active!");
       await loadStatus();
@@ -695,12 +719,12 @@ export default function SheetConfigurator() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Sheet Range Tab</label>
+                    <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">Active Leads Tab</label>
                     <input
                       type="text"
-                      placeholder="Sheet1"
+                      placeholder="Active Leads"
                       value={rangeInput}
                       onChange={(e) => setRangeInput(e.target.value)}
                       className="w-full px-4 py-2 text-sm bg-gray-55 dark:bg-[rgba(255,255,255,0.02)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-800 dark:text-white font-mono placeholder-gray-400 dark:placeholder-[#555566] transition-all outline-none"
@@ -726,6 +750,25 @@ export default function SheetConfigurator() {
                       {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
                       Save Connection
                     </button>
+                  </div>
+                </div>
+
+                {/* Static Primary Sheet Tabs Display */}
+                <div className="space-y-2 pt-3 border-t border-gray-200 dark:border-[rgba(255,255,255,0.06)]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
+                      Connected Sheet Tabs
+                    </label>
+                    <span className="text-[10px] text-gray-400">Tabs mapped directly to UI navigation</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 py-1">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-[#3CD395] rounded-lg text-xs font-semibold">
+                      Active Leads
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-[#3CD395] rounded-lg text-xs font-semibold">
+                      Internal Leads
+                    </span>
                   </div>
                 </div>
               </form>

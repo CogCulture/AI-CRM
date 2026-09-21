@@ -8,6 +8,7 @@ router = APIRouter()
 class ConfigUpdate(BaseModel):
     sheet_url: Optional[str] = None
     sheet_range: Optional[str] = None
+    sheet_tabs: Optional[List[str]] = None
     visible_columns: Optional[List[str]] = None
     column_order: Optional[List[str]] = None
     graphs: Optional[List[dict]] = None

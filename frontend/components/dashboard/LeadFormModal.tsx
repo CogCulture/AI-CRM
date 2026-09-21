@@ -103,20 +103,6 @@ export default function LeadFormModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check mandatory fields validation
-    const missing: string[] = [];
-    (mandatoryColumns || []).forEach((col) => {
-      const val = (formData[col] || "").trim();
-      if (!val) {
-        missing.push(col);
-      }
-    });
-
-    if (missing.length > 0) {
-      toast.error(`The following field(s) are required: ${missing.join(", ")}`);
-      return;
-    }
-
     setLoading(true);
     try {
       await onSave(formData);
@@ -154,13 +140,13 @@ export default function LeadFormModal({
               const hl = header.toLowerCase();
               const isStatusDropdown = hl === "status";
               const isStageDropdown = hl === "stage";
+              const isSourceDropdown = hl.includes("source");
               const val = formData[header] || "";
-              const isRequired = mandatoryColumns.includes(header);
 
               return (
                 <div key={header} className="space-y-1.5 flex flex-col">
                   <label className="text-[10px] font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
-                    {header} {isRequired && <span className="text-red-500 font-bold ml-0.5">*</span>}
+                    {header}
                   </label>
                   
                   {isStatusDropdown ? (
@@ -188,6 +174,20 @@ export default function LeadFormModal({
                       <option value="Negotiation">Negotiation</option>
                       <option value="Won">Won</option>
                       <option value="Lost">Lost</option>
+                    </select>
+                  ) : isSourceDropdown ? (
+                    <select
+                      value={val}
+                      onChange={(e) => handleChange(header, e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select Source --</option>
+                      <option value="Internal">Internal</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Website">Website</option>
+                      <option value="Inbound">Inbound</option>
+                      <option value="Direct">Direct</option>
+                      <option value="Direct mail">Direct mail</option>
                     </select>
                   ) : (
                     <input

@@ -111,9 +111,12 @@ function DashboardContent() {
 
   async function loadData(showToast = false, bypassCache = false) {
     try {
+      // Target range based on tab: "Internal Leads" for internal leads, "Active Leads" for Active Leads & Tender
+      const targetTabRange = tab === "internal_leads" ? "Internal Leads" : "Active Leads";
+
       const [sum, data] = await Promise.all([
         api.getDashboardSummary(bypassCache),
-        api.getSheetData(bypassCache),
+        api.getSheetData(bypassCache, targetTabRange),
       ]);
       setSummary(sum);
       setSheetData(data);
@@ -143,8 +146,8 @@ function DashboardContent() {
   }
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(false, false);
+  }, [tab]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -311,22 +314,28 @@ function DashboardContent() {
   }, [sheetData, dateCol]);
 
   const isTendersTab = tab === "tenders";
+  const isInternalLeadsTab = tab === "internal_leads";
 
   // Filter rows by tab (lead type) and selected month
   const filteredRows = React.useMemo(() => {
     if (!sheetData || !sheetData.rows) return [];
     
-    const leadTypeCol = sheetData.headers.find(h => {
-      const hl = h.toLowerCase();
-      return hl === "lead type" || hl.includes("lead type");
+    const sourceColName = sheetData.headers.find(h => {
+      const hl = h.toLowerCase().trim();
+      return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
     }) || "";
 
     let rows = sheetData.rows;
     if (isTendersTab) {
+      // Tender Section: fetched from Active Leads sheet, filtered for rows where Source column contains 'Tender'
       rows = rows.filter(row => {
+        if (sourceColName && row[sourceColName]) {
+          const val = String(row[sourceColName]).trim().toLowerCase();
+          if (val.includes("tender")) return true;
+        }
         for (const [k, v] of Object.entries(row)) {
           const keyLower = k.toLowerCase();
-          if (keyLower.includes("lead type") || keyLower.includes("type") || keyLower.includes("source") || keyLower.includes("category")) {
+          if (keyLower.includes("source") || keyLower.includes("type") || keyLower.includes("category")) {
             const val = String(v || "").trim().toLowerCase();
             if (val === "tender" || val === "tenders" || val.includes("tender")) {
               return true;
@@ -335,11 +344,19 @@ function DashboardContent() {
         }
         return false;
       });
+    } else if (isInternalLeadsTab) {
+      // Internal Leads Section: fetched directly from Internal Leads primary sheet tab
+      rows = sheetData.rows;
     } else {
+      // Active Leads Section: exclude any row where 'Tender' is present in the Source column
       rows = rows.filter(row => {
+        if (sourceColName && row[sourceColName]) {
+          const val = String(row[sourceColName]).trim().toLowerCase();
+          if (val.includes("tender")) return false;
+        }
         for (const [k, v] of Object.entries(row)) {
           const keyLower = k.toLowerCase();
-          if (keyLower.includes("lead type") || keyLower.includes("type") || keyLower.includes("source") || keyLower.includes("category")) {
+          if (keyLower.includes("source") || keyLower.includes("type") || keyLower.includes("category")) {
             const val = String(v || "").trim().toLowerCase();
             if (val === "tender" || val === "tenders" || val.includes("tender")) {
               return false;
@@ -557,6 +574,41 @@ function DashboardContent() {
         <EmptyState onLoadMock={handleLoadMock} />
       ) : tab === "data" && sheetData ? (
         <DataPlatformView sheetData={sheetData} onRefresh={() => loadData(false, true)} />
+      ) : tab === "help" ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="font-sans text-2xl text-gray-900 dark:text-white font-bold tracking-tight">Help & Documentation</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Learn how to manage your workspace, sync Google Sheets, and configure CRM metrics.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 bg-white dark:bg-[#111118] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-2xl shadow-sm space-y-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Connecting Google Sheets</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                To sync live lead data, navigate to <strong className="text-emerald-500">Settings</strong> and paste your Google Sheet URL. Ensure your sheet is shared with View permissions.
+              </p>
+            </div>
+            <div className="p-5 bg-white dark:bg-[#111118] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-2xl shadow-sm space-y-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Managing Sidebar Categories</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                The sidebar categorizes your leads into <strong>Active Leads</strong>, <strong>Internal Leads</strong>, <strong>Tender</strong>, and <strong>Data Platform</strong>.
+              </p>
+            </div>
+            <div className="p-5 bg-white dark:bg-[#111118] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-2xl shadow-sm space-y-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Adding & Updating Leads</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Click <strong className="text-emerald-500">+ Add Lead</strong> on the dashboard to push new rows directly into your connected Google Sheet in real-time.
+              </p>
+            </div>
+            <div className="p-5 bg-white dark:bg-[#111118] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-2xl shadow-sm space-y-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Charts & Widgets</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Click <strong className="text-emerald-500">+ Add Widget</strong> to build interactive line charts and pie breakdowns based on any column in your spreadsheet.
+              </p>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="space-y-6 relative">
           {/* Due Today Alert Box floating in the top right */}
@@ -610,7 +662,15 @@ function DashboardContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="font-sans text-2xl text-gray-900 dark:text-white font-bold tracking-tight">
-                {isTendersTab ? "Tenders" : "Dashboard"}
+                {tab === "tenders" 
+                  ? "Tender" 
+                  : tab === "internal_leads" 
+                  ? "Internal Leads" 
+                  : tab === "data" 
+                  ? "Data Platform" 
+                  : tab === "help"
+                  ? "Help"
+                  : "Active Leads"}
               </h1>
               
               {sheetData && uniqueMonths.length > 0 && (

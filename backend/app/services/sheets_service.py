@@ -174,17 +174,33 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
         gid = _extract_gid(sheet_url)
         service = _get_service()
 
-        # 1. Fetch spreadsheet metadata to map gid to title and find hidden rows/columns
+        # 1. Fetch spreadsheet metadata to discover sheet tabs and find hidden rows/columns
+        sheet_title_map = {}
+        first_sheet_title = range_name
         try:
             metadata = service.spreadsheets().get(
                 spreadsheetId=sheet_id,
-                ranges=[range_name] if range_name else [],
                 fields="sheets(properties(title,sheetId),data(rowMetadata(hiddenByUser,hiddenByFilter),columnMetadata(hiddenByUser,hiddenByFilter)))"
             ).execute()
             
             sheets = metadata.get("sheets", [])
             target_sheet = None
-            if gid:
+            
+            if sheets:
+                first_sheet_title = sheets[0].get("properties", {}).get("title") or "Sheet1"
+                sheet_title_map = {
+                    s.get("properties", {}).get("title", "").strip().lower(): s.get("properties", {}).get("title")
+                    for s in sheets if s.get("properties", {}).get("title")
+                }
+            
+            # Match requested range_name against existing sheet titles
+            if range_name and range_name.strip().lower() in sheet_title_map:
+                actual_title = sheet_title_map[range_name.strip().lower()]
+                for s in sheets:
+                    if s.get("properties", {}).get("title") == actual_title:
+                        target_sheet = s
+                        break
+            elif gid:
                 for s in sheets:
                     props = s.get("properties", {})
                     if str(props.get("sheetId")) == str(gid):
@@ -217,13 +233,22 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             hidden_rows = set()
             hidden_cols = set()
 
-        # 2. Fetch the values using the mapped range
-        result = (
-            service.spreadsheets()
-            .values()
-            .get(spreadsheetId=sheet_id, range=final_range)
-            .execute()
-        )
+        # 2. Fetch values with fallback if specified range does not exist
+        try:
+            result = (
+                service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sheet_id, range=final_range)
+                .execute()
+            )
+        except Exception as range_err:
+            print(f"Failed to fetch range '{final_range}': {range_err}. Retrying with default sheet '{first_sheet_title}'...")
+            result = (
+                service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sheet_id, range=first_sheet_title)
+                .execute()
+            )
 
         values = result.get("values", [])
         if not values:

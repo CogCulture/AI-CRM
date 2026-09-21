@@ -11,7 +11,8 @@ import {
   Database, 
   Settings, 
   HelpCircle, 
-  LogOut 
+  LogOut,
+  FileText 
 } from "lucide-react";
 import { ThemeToggle } from "../ThemeToggle";
 import { api } from "../../lib/api";
@@ -22,29 +23,15 @@ interface DashboardShellProps {
 
 // Check if email domain is a public/personal email provider
 function isWorkEmail(email: string): boolean {
-  if (!email) return false;
-  const domain = email.split("@")[1]?.toLowerCase();
-  if (!domain) return false;
-  const publicDomains = [
-    "gmail.com",
-    "yahoo.com",
-    "hotmail.com",
-    "outlook.com",
-    "live.com",
-    "aol.com",
-    "icloud.com",
-    "mail.com",
-    "gmx.com",
-    "yandex.com"
-  ];
-  return !publicDomains.includes(domain);
+  return true; // Bypass work-email restriction to allow personal Google accounts
 }
+
 
 export default function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentTab = searchParams.get("tab") || "dashboard";
+  const currentTab = searchParams.get("tab") || "active_leads";
   const [user, setUser] = useState<{ name: string; email: string; picture: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -74,9 +61,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   }, [router]);
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Tenders", href: "/dashboard?tab=tenders", icon: TrendingUp },
-    { name: "Data Platform", href: "/dashboard?tab=data", icon: Database },
+    { name: "Active Leads", href: "/dashboard?tab=active_leads", icon: LayoutDashboard, key: "active_leads" },
+    { name: "Internal Leads", href: "/dashboard?tab=internal_leads", icon: FileText, key: "internal_leads" },
+    { name: "Tender", href: "/dashboard?tab=tenders", icon: TrendingUp, key: "tenders" },
+    { name: "Data Platform", href: "/dashboard?tab=data", icon: Database, key: "data" },
   ];
 
   const handleSignOut = async () => {
@@ -132,8 +120,11 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           {/* Nav Items */}
           <nav className="px-3 py-2 space-y-1">
             {navigation.map((item) => {
-              const targetTab = item.href.includes("tab=") ? item.href.split("tab=")[1] : "dashboard";
-              const isActive = pathname === "/dashboard" && currentTab === targetTab;
+              const activeParam = searchParams.get("tab");
+              const isActive = pathname === "/dashboard" && (
+                activeParam === item.key || 
+                (item.key === "active_leads" && (!activeParam || activeParam === "dashboard" || activeParam === "active_leads"))
+              );
               const Icon = item.icon;
               return (
                 <Link
@@ -141,8 +132,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 group relative ${
                     isActive
-                      ? "text-emerald-700 dark:text-[#3CD395] bg-emerald-50 dark:bg-[#132A21] border border-emerald-200 dark:border-[#1E3F33]/40 shadow-[0_0_15px_rgba(16,185,129,0.02)]"
-                      : "text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] border border-transparent"
+                      ? "text-emerald-700 dark:text-[#3CD395] bg-emerald-50 dark:bg-[#132A21] border border-emerald-200 dark:border-[#1E3F33]/40 shadow-[0_0_15px_rgba(16,185,129,0.02)] font-semibold"
+                      : "text-gray-600 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] border border-transparent"
                   }`}
                 >
                   <Icon className={`w-4 h-4 transition-transform duration-150 group-hover:scale-105 ${isActive ? "text-emerald-600 dark:text-[#3CD395]" : "text-gray-400 dark:text-[#888899]"}`} />
@@ -157,8 +148,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               href="/settings"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 group relative ${
                 pathname === "/settings"
-                  ? "text-emerald-700 dark:text-[#3CD395] bg-emerald-50 dark:bg-[#132A21] border border-emerald-200 dark:border-[#1E3F33]/40"
-                  : "text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] border border-transparent"
+                  ? "text-emerald-700 dark:text-[#3CD395] bg-emerald-50 dark:bg-[#132A21] border border-emerald-200 dark:border-[#1E3F33]/40 font-semibold"
+                  : "text-gray-600 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] border border-transparent"
               }`}
             >
               <Settings className={`w-4 h-4 transition-transform duration-150 group-hover:scale-105 ${pathname === "/settings" ? "text-emerald-600 dark:text-[#3CD395]" : "text-gray-400 dark:text-[#888899]"}`} />
@@ -167,9 +158,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
             <Link
               href="/dashboard?tab=help"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 group text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] border border-transparent"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 group relative ${
+                pathname === "/dashboard" && searchParams.get("tab") === "help"
+                  ? "text-emerald-700 dark:text-[#3CD395] bg-emerald-50 dark:bg-[#132A21] border border-emerald-200 dark:border-[#1E3F33]/40 font-semibold"
+                  : "text-gray-600 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[rgba(255,255,255,0.02)] border border-transparent"
+              }`}
             >
-              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-[#888899]" />
+              <HelpCircle className={`w-4 h-4 transition-transform duration-150 group-hover:scale-105 ${pathname === "/dashboard" && searchParams.get("tab") === "help" ? "text-emerald-600 dark:text-[#3CD395]" : "text-gray-400 dark:text-[#888899]"}`} />
               Help
             </Link>
           </nav>

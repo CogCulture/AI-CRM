@@ -9,6 +9,7 @@ export interface SheetData {
 export interface Config {
   sheet_url: string;
   sheet_range: string;
+  sheet_tabs?: string[];
   visible_columns: string[];
   column_order: string[];
   graphs: GraphConfig[];
