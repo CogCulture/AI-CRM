@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { SlidersHorizontal, ArrowUpDown, Edit3, Trash2, Search } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, Edit3, Trash2, Search, X } from "lucide-react";
 import ColumnManager from "./ColumnManager";
 
 interface CRMTableProps {
@@ -14,6 +14,8 @@ interface CRMTableProps {
   onSearchChange?: (val: string) => void;
   onEdit?: (row: Record<string, any>) => void;
   onDelete?: (row: Record<string, any>) => void;
+  isTenderDashboard?: boolean;
+  currentTab?: string;
 }
 
 const getCampaignIcon = (name: string) => {
@@ -197,6 +199,35 @@ const getLegendColor = (sourceStr: string) => {
   return { name: sourceStr, dot: "bg-[#0284C7]", pill: "bg-sky-50 dark:bg-sky-950/80 text-sky-900 dark:text-sky-200 border-sky-200 dark:border-sky-800/40" };
 };
 
+// Helper to retrieve row status value
+const getRowStatus = (row: Record<string, any>): string => {
+  for (const [k, v] of Object.entries(row)) {
+    const kLower = k.toLowerCase().trim();
+    if (kLower === "status") {
+      const val = String(v || "").trim();
+      if (val) return val;
+    }
+  }
+  return "";
+};
+
+// Helper to retrieve status glowing dot styling
+const getStatusDotClasses = (statusStr: string): string => {
+  const norm = statusStr.toLowerCase().trim();
+  if (norm === "hot") return "bg-[#FF1744] shadow-[0_0_12px_#FF1744] animate-[pulse_0.8s_ease-in-out_infinite] scale-125";
+  if (norm === "warm") return "bg-[#FFD600] shadow-[0_0_8px_#FFD600]";
+  if (norm === "cold") return "bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]";
+  if (norm === "discovery") return "bg-[#AA00FF] shadow-[0_0_8px_#AA00FF]";
+  if (["won", "closed won", "converted", "completed", "success"].some(x => norm.includes(x))) return "bg-[#00E676] shadow-[0_0_8px_#00E676]";
+  if (["dead", "lost"].some(x => norm.includes(x))) return "bg-[#424242] shadow-[0_0_8px_#424242]";
+  if (norm === "lead") return "bg-gray-400 shadow-[0_0_8px_rgba(156,163,175,0.8)]";
+  if (norm === "proposal sent" || norm === "proposal") return "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]";
+  if (norm === "portfolio sent" || norm === "portfolio") return "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]";
+  if (norm === "tender lead" || norm === "tender") return "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)]";
+  if (!norm) return "";
+  return "bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.8)]";
+};
+
 export default function CRMTable({
   headers,
   rows,
@@ -207,6 +238,8 @@ export default function CRMTable({
   onSearchChange,
   onEdit,
   onDelete,
+  isTenderDashboard,
+  currentTab,
 }: CRMTableProps) {
   const [localSearchTerm, setLocalSearchTerm] = useState("");
   const [isManagerOpen, setIsManagerOpen] = useState(false);
@@ -238,6 +271,7 @@ export default function CRMTable({
 
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [selectedDetailsRow, setSelectedDetailsRow] = useState<Record<string, any> | null>(null);
 
   const activeSearch = searchTerm !== undefined ? searchTerm : localSearchTerm;
 
@@ -263,7 +297,45 @@ export default function CRMTable({
   });
 
   // Inject "Lead ID" at the very beginning of the active columns list (filtering out any duplicates)
-  const activeCols = ["Lead ID", ...activeColsRaw.filter((col) => col !== "Lead ID")];
+  let activeCols = ["Lead ID", ...activeColsRaw.filter((col) => col !== "Lead ID")];
+  
+  // Globally remove Status column from table display
+  activeCols = activeCols.filter(col => {
+    const colLower = col.toLowerCase().trim();
+    if (colLower === "status") return false;
+    
+    // For Tender Dashboard, remove specific columns
+    if (isTenderDashboard) {
+      if (
+        colLower === "source" || 
+        colLower === "sources" || 
+        colLower.includes("poc email") ||
+        colLower === "email" ||
+        colLower.includes("message from prospect")
+      ) {
+        return false;
+      }
+    }
+
+    // For Active Leads and Internal Leads, ONLY show the requested columns
+    if (currentTab === "active_leads" || currentTab === "internal_leads") {
+      const isAllowed = 
+        colLower === "lead id" || 
+        colLower === "date" || 
+        colLower.includes("company") || 
+        colLower === "requirement" || 
+        colLower === "stage" || 
+        colLower === "cog poc" || 
+        colLower === "poc" ||
+        colLower === "actions"; // keep actions column if any
+      
+      if (!isAllowed) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   // Sorting logic
   const handleSort = (col: string) => {
@@ -353,6 +425,25 @@ export default function CRMTable({
                 >
                   <span className={`w-2 h-2 rounded-full ${item.dot} shadow-xs shrink-0`} />
                   <span>{src}</span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Status Palette Legend Blocks */}
+          <div className="flex items-center flex-wrap gap-1.5 pt-0.5 mt-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899] mr-1">
+              Status Palette:
+            </span>
+            {["Hot", "Warm", "Cold", "Discovery", "Won", "Lost"].map(status => {
+              const dotClass = getStatusDotClasses(status);
+              return (
+                <div
+                  key={status}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border transition-all shadow-xs bg-gray-50 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700/50"
+                >
+                  <span className={`w-2 h-2 rounded-full ${dotClass} shadow-xs shrink-0`} />
+                  <span>{status}</span>
                 </div>
               );
             })}
@@ -560,10 +651,39 @@ export default function CRMTable({
                     // Render formatted cells
                     const renderCellContent = () => {
                       if (col === "Lead ID") {
+                        const leadStatus = getRowStatus(row);
+                        const statusDotClasses = getStatusDotClasses(leadStatus);
                         return (
-                          <span className="font-semibold text-gray-950 dark:text-white font-mono">
-                            {cellVal}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-950 dark:text-white font-mono">
+                              {cellVal}
+                            </span>
+                            {statusDotClasses && (
+                              <span 
+                                className={`w-2 h-2 rounded-full ${statusDotClasses}`} 
+                                title={leadStatus}
+                              />
+                            )}
+                          </div>
+                        );
+                      }
+                      if (col.toLowerCase().includes("company")) {
+                        const rowSource = getRowSource(row).toLowerCase();
+                        const isWebsite = rowSource.includes("website") || rowSource.includes("web");
+                        return (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedDetailsRow(row)}
+                              className="font-bold text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer"
+                            >
+                              {cellVal}
+                            </button>
+                            {isWebsite && (
+                              <span className="px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 rounded text-[9px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                Fresh Lead
+                              </span>
+                            )}
+                          </div>
                         );
                       }
                       if (isValue) {
@@ -802,6 +922,43 @@ export default function CRMTable({
         columnOrder={columnOrder}
         onSave={onSaveConfig}
       />
+
+      {/* Lead Details Modal */}
+      {selectedDetailsRow && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" onClick={() => setSelectedDetailsRow(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl bg-white dark:bg-[#111118] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-[#161622]/50">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white font-sans flex items-center gap-2">
+                <span>{selectedDetailsRow["Company Name"] || selectedDetailsRow["Company"] || "Lead Details"}</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                  {getLeadId(selectedDetailsRow)}
+                </span>
+              </h3>
+              <button 
+                onClick={() => setSelectedDetailsRow(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 hover:bg-gray-200 dark:bg-[#1C1C2D] dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                {headers.filter(h => h !== "_row_num").map(h => (
+                  <div key={h} className="flex flex-col gap-1.5 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] pb-3 last:border-0">
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono">
+                      {h}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-[#dedee5] font-sans break-words whitespace-pre-wrap">
+                      {String(selectedDetailsRow[h] || "—")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

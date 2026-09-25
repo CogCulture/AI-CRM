@@ -796,6 +796,8 @@ function DashboardContent() {
                 onSearchChange={setSearchTerm}
                 onEdit={!sheetData?.is_mock ? handleEditLead : undefined}
                 onDelete={!sheetData?.is_mock ? handleDeleteLead : undefined}
+                isTenderDashboard={isTendersTab}
+                currentTab={tab}
               />
             )}
           </div>
@@ -838,6 +840,7 @@ function DashboardContent() {
               initialData={selectedLead}
               onSave={handleSaveLead}
               title={modalTitle}
+              currentTab={tab}
               mandatoryColumns={summary?.mandatory_columns || []}
             />
           )}

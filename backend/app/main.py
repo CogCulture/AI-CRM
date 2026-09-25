@@ -1,3 +1,6 @@
+import socket
+socket.setdefaulttimeout(15.0) # Prevent Google API from hanging the threadpool
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -49,6 +52,10 @@ async def schedule_daily_tasks():
 
 @app.on_event("startup")
 async def startup_event():
+    import anyio.to_thread
+    # Increase threadpool to prevent exhaustion from concurrent Google Sheets API calls
+    anyio.to_thread.current_default_thread_limiter().total_tokens = 200
+
     import os
     run_scheduler = os.environ.get("RUN_BACKGROUND_SCHEDULER", "true").lower() == "true"
     if run_scheduler:

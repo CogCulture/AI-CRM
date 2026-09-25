@@ -236,19 +236,19 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
         </h4>
         <div className="flex flex-col gap-3">
           {/* Hot leads row */}
-          <div className="p-3 rounded-xl border border-red-150/50 dark:border-red-500/10 bg-red-50/20 dark:bg-red-500/5 flex flex-col gap-1.5 shadow-sm">
+          <div className="p-3 rounded-xl border border-[#FF1744]/20 dark:border-[#FF1744]/10 bg-[#FF1744]/5 flex flex-col gap-1.5 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#FF1744] shadow-[0_0_8px_#FF1744] animate-[pulse_0.8s_ease-in-out_infinite]" />
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Hot Leads</span>
               </div>
-              <span className="text-xs font-bold text-red-600 dark:text-red-400">
+              <span className="text-xs font-bold text-[#FF1744]">
                 {formatCurrency(hotRevenue)}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
-                className="bg-red-500 h-full rounded-full transition-all duration-500" 
+                className="bg-[#FF1744] h-full rounded-full transition-all duration-500" 
                 style={{ width: `${totalEstimatedRevenue > 0 ? (hotRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
               />
             </div>
@@ -259,19 +259,19 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
           </div>
 
           {/* Warm leads row */}
-          <div className="p-3 rounded-xl border border-amber-150/50 dark:border-amber-500/10 bg-amber-50/20 dark:bg-amber-500/5 flex flex-col gap-1.5 shadow-sm">
+          <div className="p-3 rounded-xl border border-[#FFD600]/20 dark:border-[#FFD600]/10 bg-[#FFD600]/5 flex flex-col gap-1.5 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#FFD600]" />
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Warm Leads</span>
               </div>
-              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+              <span className="text-xs font-bold text-[#FFD600]">
                 {formatCurrency(warmRevenue)}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
-                className="bg-amber-500 h-full rounded-full transition-all duration-500" 
+                className="bg-[#FFD600] h-full rounded-full transition-all duration-500" 
                 style={{ width: `${totalEstimatedRevenue > 0 ? (warmRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
               />
             </div>
@@ -282,19 +282,19 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
           </div>
 
           {/* Cold leads row */}
-          <div className="p-3 rounded-xl border border-blue-150/50 dark:border-blue-500/10 bg-blue-50/20 dark:bg-blue-500/5 flex flex-col gap-1.5 shadow-sm">
+          <div className="p-3 rounded-xl border border-[#00E5FF]/20 dark:border-[#00E5FF]/10 bg-[#00E5FF]/5 flex flex-col gap-1.5 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF]" />
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Cold Leads</span>
               </div>
-              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+              <span className="text-xs font-bold text-[#00E5FF]">
                 {formatCurrency(coldRevenue)}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
-                className="bg-blue-500 h-full rounded-full transition-all duration-500" 
+                className="bg-[#00E5FF] h-full rounded-full transition-all duration-500" 
                 style={{ width: `${totalEstimatedRevenue > 0 ? (coldRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
               />
             </div>
@@ -305,19 +305,19 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
           </div>
 
           {/* Discovery leads row */}
-          <div className="p-3 rounded-xl border border-sky-150/50 dark:border-sky-500/10 bg-sky-50/20 dark:bg-sky-500/5 flex flex-col gap-1.5 shadow-sm">
+          <div className="p-3 rounded-xl border border-[#AA00FF]/20 dark:border-[#AA00FF]/10 bg-[#AA00FF]/5 flex flex-col gap-1.5 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#AA00FF]" />
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Discovery Leads</span>
               </div>
-              <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
+              <span className="text-xs font-bold text-[#AA00FF]">
                 {formatCurrency(discoveryRevenue)}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
-                className="bg-sky-500 h-full rounded-full transition-all duration-500" 
+                className="bg-[#AA00FF] h-full rounded-full transition-all duration-500" 
                 style={{ width: `${totalEstimatedRevenue > 0 ? (discoveryRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
               />
             </div>

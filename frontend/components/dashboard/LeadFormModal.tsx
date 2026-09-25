@@ -11,6 +11,7 @@ interface LeadFormModalProps {
   initialData?: Record<string, any> | null;
   onSave: (data: Record<string, any>) => Promise<void>;
   title: string;
+  currentTab?: string;
   mandatoryColumns?: string[];
 }
 
@@ -59,15 +60,38 @@ export default function LeadFormModal({
   initialData,
   onSave,
   title,
+  currentTab,
   mandatoryColumns = [],
 }: LeadFormModalProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   // Exclude technical metadata fields and ID indices
-  const formHeaders = headers.filter(
+  let formHeaders = headers.filter(
     (h) => h !== "_row_num" && h.toLowerCase() !== "no."
   );
+
+  // Ensure certain virtual fields are always in the form even if not yet added to Google Sheets by the user
+  const virtualHeaders = ["Cog POC Phone Number", "Notes / Remarks"];
+  if (currentTab === "internal_leads") {
+    virtualHeaders.push("Lead Type");
+  }
+
+  virtualHeaders.forEach(vh => {
+    if (!formHeaders.some(h => h.toLowerCase() === vh.toLowerCase())) {
+      formHeaders.push(vh);
+    }
+  });
+
+  const getUILabel = (rawHeader: string) => {
+    const hl = rawHeader.toLowerCase().trim();
+    if (hl === "name") return "Company POC Name";
+    if (hl === "email") return "Company POC Email ID";
+    if (hl === "phone") return "Company POC Phone Number";
+    if (hl === "poc email") return "Cog POC Email ID";
+    if (hl === "cog poc") return "Cog POC";
+    return rawHeader;
+  };
 
   useEffect(() => {
     if (initialData) {
@@ -142,16 +166,24 @@ export default function LeadFormModal({
               const isStageDropdown = hl === "stage";
               const isSourceDropdown = hl.includes("source");
               const val = formData[header] || "";
+              
+              const uiLabel = getUILabel(header).toLowerCase();
+              const mandatoryFields = [
+                "date", "company name", "requirement", "stage", "status", "lead type", "follow-up date", "company poc name", "company poc email id", "company poc phone number", "cog poc", "cog poc email id", "cog poc phone number", "notes / remarks", "notes/remarks", "notes", "remarks"
+              ];
+              const isMandatory = mandatoryFields.includes(uiLabel) || uiLabel.includes("poc email") || uiLabel.includes("poc phone");
 
               return (
                 <div key={header} className="space-y-1.5 flex flex-col">
                   <label className="text-[10px] font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
-                    {header}
+                    {getUILabel(header)}
+                    {isMandatory && <span className="text-red-500 ml-1">*</span>}
                   </label>
                   
                   {isStatusDropdown ? (
                     <select
                       value={val}
+                      required={isMandatory}
                       onChange={(e) => handleChange(header, e.target.value)}
                       className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none cursor-pointer"
                     >
@@ -163,6 +195,7 @@ export default function LeadFormModal({
                   ) : isStageDropdown ? (
                     <select
                       value={val}
+                      required={isMandatory}
                       onChange={(e) => handleChange(header, e.target.value)}
                       className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none cursor-pointer"
                     >
@@ -178,6 +211,7 @@ export default function LeadFormModal({
                   ) : isSourceDropdown ? (
                     <select
                       value={val}
+                      required={isMandatory}
                       onChange={(e) => handleChange(header, e.target.value)}
                       className="w-full px-3.5 py-2 text-xs bg-gray-50 dark:bg-[#161622] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-900 dark:text-white font-sans outline-none cursor-pointer"
                     >
@@ -192,8 +226,9 @@ export default function LeadFormModal({
                   ) : (
                     <input
                       type={hl.includes("date") || hl.includes("deadline") || hl.includes("due") ? "date" : "text"}
-                      placeholder={hl === "lead id" ? "Auto-generated" : `Enter ${header}...`}
+                      placeholder={hl === "lead id" ? "Auto-generated" : `Enter ${getUILabel(header)}...`}
                       value={val}
+                      required={isMandatory && hl !== "lead id"}
                       disabled={hl === "lead id"}
                       onChange={(e) => handleChange(header, e.target.value)}
                       className={`w-full px-3.5 py-2 text-xs rounded-lg font-sans outline-none border ${
