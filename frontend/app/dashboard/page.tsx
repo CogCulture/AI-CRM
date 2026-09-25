@@ -11,6 +11,9 @@ import EmptyState from "../../components/dashboard/EmptyState";
 import LeadFormModal from "../../components/dashboard/LeadFormModal";
 import RevenueAnalysisWidget from "../../components/dashboard/RevenueAnalysisWidget";
 import DataPlatformView from "../../components/dashboard/DataPlatformView";
+import ProposalTrackerView from "../../components/dashboard/ProposalTrackerView";
+import FollowUpDashboardView from "../../components/dashboard/FollowUpDashboardView";
+import TenderDashboardView from "../../components/dashboard/TenderDashboardView";
 import { api } from "../../lib/api";
 import { SheetData, DashboardSummary, GraphConfig } from "../../lib/types";
 import { toast } from "sonner";
@@ -245,8 +248,9 @@ function DashboardContent() {
   const handleSaveLead = async (leadDataInput: Record<string, any>) => {
     try {
       setRefreshing(true);
-      if (selectedLead && selectedLead._row_num) {
-        await api.updateLead(selectedLead._row_num, leadDataInput);
+      const targetRowNum = leadDataInput._row_num || (selectedLead && selectedLead._row_num);
+      if (targetRowNum) {
+        await api.updateLead(targetRowNum, leadDataInput);
         toast.success("Lead updated successfully");
       } else {
         await api.addLead(leadDataInput);
@@ -256,6 +260,25 @@ function DashboardContent() {
     } catch (err: any) {
       toast.error(err.message || "Failed to save lead");
       throw err;
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleQuickUpdateStage = async (row: Record<string, any>, newStage: string) => {
+    try {
+      setRefreshing(true);
+      const rowNum = row._row_num;
+      if (!rowNum) {
+        toast.error("Invalid lead row index");
+        return;
+      }
+      const updatedRow = { ...row, Stage: newStage };
+      await api.updateLead(rowNum, updatedRow);
+      toast.success(`Proposal stage moved to "${newStage}"`);
+      await loadData(false, true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update proposal stage");
     } finally {
       setRefreshing(false);
     }
@@ -323,48 +346,30 @@ function DashboardContent() {
     const sourceColName = sheetData.headers.find(h => {
       const hl = h.toLowerCase().trim();
       return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
-    }) || "";
+    }) || "Source";
+
+    const isRowTender = (row: Record<string, any>) => {
+      const val = String(row[sourceColName] || "").trim().toLowerCase();
+      if (val === "tender") return true;
+      for (const [k, v] of Object.entries(row)) {
+        const kl = k.toLowerCase().trim();
+        if ((kl === "source" || kl === "sources" || kl.includes("source") || kl.includes("lead source")) && String(v || "").trim().toLowerCase() === "tender") {
+          return true;
+        }
+      }
+      return false;
+    };
 
     let rows = sheetData.rows;
     if (isTendersTab) {
-      // Tender Section: fetched from Active Leads sheet, filtered for rows where Source column contains 'Tender'
-      rows = rows.filter(row => {
-        if (sourceColName && row[sourceColName]) {
-          const val = String(row[sourceColName]).trim().toLowerCase();
-          if (val.includes("tender")) return true;
-        }
-        for (const [k, v] of Object.entries(row)) {
-          const keyLower = k.toLowerCase();
-          if (keyLower.includes("source") || keyLower.includes("type") || keyLower.includes("category")) {
-            const val = String(v || "").trim().toLowerCase();
-            if (val === "tender" || val === "tenders" || val.includes("tender")) {
-              return true;
-            }
-          }
-        }
-        return false;
-      });
+      // Tender Section: strictly rows where Source is 'Tender'
+      rows = rows.filter(row => isRowTender(row));
     } else if (isInternalLeadsTab) {
       // Internal Leads Section: fetched directly from Internal Leads primary sheet tab
       rows = sheetData.rows;
     } else {
-      // Active Leads Section: exclude any row where 'Tender' is present in the Source column
-      rows = rows.filter(row => {
-        if (sourceColName && row[sourceColName]) {
-          const val = String(row[sourceColName]).trim().toLowerCase();
-          if (val.includes("tender")) return false;
-        }
-        for (const [k, v] of Object.entries(row)) {
-          const keyLower = k.toLowerCase();
-          if (keyLower.includes("source") || keyLower.includes("type") || keyLower.includes("category")) {
-            const val = String(v || "").trim().toLowerCase();
-            if (val === "tender" || val === "tenders" || val.includes("tender")) {
-              return false;
-            }
-          }
-        }
-        return true;
-      });
+      // Active Leads Section: strictly exclude any row where Source is 'Tender' so they appear in Tender ONLY
+      rows = rows.filter(row => !isRowTender(row));
     }
 
     if (selectedMonth === "All") return rows;
@@ -390,7 +395,7 @@ function DashboardContent() {
       }
       return false;
     });
-  }, [sheetData, selectedMonth, dateCol, isTendersTab]);
+  }, [sheetData, selectedMonth, dateCol, isTendersTab, isInternalLeadsTab]);
 
   const filteredSheetData = React.useMemo<SheetData | null>(() => {
     if (!sheetData) return null;
@@ -399,6 +404,33 @@ function DashboardContent() {
       rows: filteredRows
     };
   }, [sheetData, filteredRows]);
+
+  // Active Leads non-tender sheet data slice (used by Proposal Tracker & Follow-Ups to exclude Tenders)
+  const activeLeadsSheetData = React.useMemo<SheetData | null>(() => {
+    if (!sheetData || !sheetData.rows) return null;
+    const sourceColName = sheetData.headers.find(h => {
+      const hl = h.toLowerCase().trim();
+      return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
+    }) || "Source";
+
+    const nonTenders = sheetData.rows.filter(row => {
+      const val = String(row[sourceColName] || "").trim().toLowerCase();
+      if (val === "tender") return false;
+      for (const [k, v] of Object.entries(row)) {
+        const kl = k.toLowerCase().trim();
+        if ((kl === "source" || kl === "sources" || kl.includes("source") || kl.includes("lead source")) && String(v || "").trim().toLowerCase() === "tender") {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    return {
+      ...sheetData,
+      rows: nonTenders,
+      total: nonTenders.length
+    };
+  }, [sheetData]);
 
   // Calculate display KPIs dynamically based on filtered rows
   const displayKpis = React.useMemo(() => {
@@ -574,6 +606,66 @@ function DashboardContent() {
         <EmptyState onLoadMock={handleLoadMock} />
       ) : tab === "data" && sheetData ? (
         <DataPlatformView sheetData={sheetData} onRefresh={() => loadData(false, true)} />
+      ) : tab === "followups" && sheetData ? (
+        <>
+          <FollowUpDashboardView
+            sheetData={activeLeadsSheetData || sheetData}
+            onEditLead={handleEditLead}
+            onAddLead={() => {
+              setSelectedLead({});
+              setModalTitle("Schedule New Follow-Up");
+              setIsLeadModalOpen(true);
+            }}
+            onSaveLead={handleSaveLead}
+            onDeleteLead={handleDeleteLead}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+          {/* Lead CRUD Modal for Follow-Ups */}
+          <LeadFormModal
+            isOpen={isLeadModalOpen}
+            onClose={() => setIsLeadModalOpen(false)}
+            headers={sheetData.headers}
+            initialData={selectedLead}
+            onSave={handleSaveLead}
+            title={modalTitle}
+            mandatoryColumns={summary?.mandatory_columns || []}
+          />
+        </>
+      ) : tab === "proposals" && sheetData ? (
+        <>
+          <ProposalTrackerView
+            sheetData={activeLeadsSheetData || sheetData}
+            onEditLead={handleEditLead}
+            onAddLead={() => {
+              setSelectedLead({ Stage: "Proposal sent" });
+              setModalTitle("Track New Proposal");
+              setIsLeadModalOpen(true);
+            }}
+            onUpdateStage={handleQuickUpdateStage}
+            onDeleteLead={handleDeleteLead}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+          {/* Lead CRUD Modal for Proposals */}
+          <LeadFormModal
+            isOpen={isLeadModalOpen}
+            onClose={() => setIsLeadModalOpen(false)}
+            headers={sheetData.headers}
+            initialData={selectedLead}
+            onSave={handleSaveLead}
+            title={modalTitle}
+            mandatoryColumns={summary?.mandatory_columns || []}
+          />
+        </>
+      ) : tab === "tenders" && sheetData ? (
+        <TenderDashboardView
+          sheetData={sheetData}
+          onRefresh={handleRefresh}
+          onSaveLead={handleSaveLead}
+          onDeleteLead={handleDeleteLead}
+          refreshing={refreshing}
+        />
       ) : tab === "help" ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between">

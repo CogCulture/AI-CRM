@@ -174,13 +174,13 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
         gid = _extract_gid(sheet_url)
         service = _get_service()
 
-        # 1. Fetch spreadsheet metadata to discover sheet tabs and find hidden rows/columns
+        # 1. Fetch spreadsheet metadata to discover sheet tabs
         sheet_title_map = {}
         first_sheet_title = range_name
         try:
             metadata = service.spreadsheets().get(
                 spreadsheetId=sheet_id,
-                fields="sheets(properties(title,sheetId),data(rowMetadata(hiddenByUser,hiddenByFilter),columnMetadata(hiddenByUser,hiddenByFilter)))"
+                fields="sheets.properties(title,sheetId)"
             ).execute()
             
             sheets = metadata.get("sheets", [])
@@ -211,27 +211,9 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                 target_sheet = sheets[0]
                 
             final_range = target_sheet.get("properties", {}).get("title") if target_sheet else range_name
-            
-            hidden_rows = set()
-            hidden_cols = set()
-            if target_sheet and target_sheet.get("data"):
-                grid_data = target_sheet["data"][0]
-                row_meta = grid_data.get("rowMetadata", [])
-                col_meta = grid_data.get("columnMetadata", [])
-                
-                for idx, r in enumerate(row_meta):
-                    if r.get("hiddenByUser") or r.get("hiddenByFilter"):
-                        hidden_rows.add(idx)
-                        
-                for idx, c in enumerate(col_meta):
-                    if c.get("hiddenByUser") or c.get("hiddenByFilter"):
-                        hidden_cols.add(idx)
-                        
         except Exception as meta_err:
             print(f"Failed to fetch sheet metadata (falling back to range '{range_name}'): {meta_err}")
             final_range = range_name
-            hidden_rows = set()
-            hidden_cols = set()
 
         # 2. Fetch values with fallback if specified range does not exist
         try:
@@ -255,16 +237,7 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             data = {"headers": [], "rows": [], "total": 0, "is_mock": False}
         else:
             raw_headers = values[0]
-            
-            # Filter hidden columns from headers
-            headers_indices = []
-            filtered_headers = []
-            for c_idx, h in enumerate(raw_headers):
-                if c_idx not in hidden_cols:
-                    headers_indices.append(c_idx)
-                    filtered_headers.append(h)
-            
-            headers = _deduplicate_headers(filtered_headers)
+            headers = _deduplicate_headers(raw_headers)
             has_lead_id = "Lead ID" in headers
             if not has_lead_id:
                 headers = ["Lead ID"] + headers
@@ -272,24 +245,22 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             rows = values[1:]
             normalized = []
             for idx, row in enumerate(rows):
-                # Data row is at index idx + 1 in the spreadsheet grid
+                # Data row is at index idx + 1 in the spreadsheet grid (row 1 is headers)
                 grid_row_idx = idx + 1
-                if grid_row_idx in hidden_rows:
-                    continue
-                    
                 row_dict = {}
                 row_has_data = False
-                # Fill row values, respecting hidden column indices
-                for new_idx, c_idx in enumerate(headers_indices):
-                    val = row[c_idx].strip() if c_idx < len(row) else ""
-                    row_dict[headers[new_idx + (1 if not has_lead_id else 0)]] = val
+                
+                for new_idx, h in enumerate(raw_headers):
+                    val = row[new_idx].strip() if new_idx < len(row) else ""
+                    header_key = headers[new_idx + (1 if not has_lead_id else 0)]
+                    row_dict[header_key] = val
                     if val != "":
                         row_has_data = True
                 
                 if row_has_data:
                     non_empty_cols = [k for k, v in row_dict.items() if v != ""]
                     # Exclude single-cell section header divider rows (e.g. 'OCTOBER LEADS (GOOGLE ADS)')
-                    if len(non_empty_cols) == 1:
+                    if len(non_empty_cols) <= 1:
                         continue
                     # Require at least 2 non-empty columns to be a real data row
                     if len(non_empty_cols) < 2:
@@ -301,7 +272,7 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                         row_dict["Lead ID"] = f"COG-{1000 + row_dict['_row_num']}"
                     
                     normalized.append(row_dict)
-            data = {"headers": headers, "rows": normalized, "total": len(normalized), "is_mock": False}
+            data = _apply_local_overrides({"headers": headers, "rows": normalized, "total": len(normalized), "is_mock": False})
             
         _cache[cache_key] = data
         return data
@@ -309,187 +280,331 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
     except Exception as api_err:
         print(f"Sheets API fetch failed: {api_err}. Trying public CSV export fallback...")
         try:
-            data = _fetch_public_csv(sheet_url)
+            data = _apply_local_overrides(_fetch_public_csv(sheet_url))
             _cache[cache_key] = data
             return data
         except Exception as csv_err:
             print(f"Public CSV fallback failed: {csv_err}")
             raise RuntimeError(f"Google Sheets API Error: {api_err}. Fallback Error: {csv_err}")
 
+import json as _json_mod
+
+def _get_overrides_path() -> str:
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(base_dir, "local_overrides.json")
+
+def _load_overrides() -> dict:
+    p = _get_overrides_path()
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return _json_mod.load(f)
+        except Exception:
+            pass
+    return {"updated": {}, "added": [], "deleted": []}
+
+def _save_overrides(overrides: dict):
+    p = _get_overrides_path()
+    try:
+        with open(p, "w", encoding="utf-8") as f:
+            _json_mod.dump(overrides, f, indent=2)
+    except Exception as e:
+        print(f"Failed to save local overrides: {e}")
+
+def _clean_lead_payload(lead_data: dict) -> dict:
+    return {k: str(v).strip() if v is not None else "" for k, v in lead_data.items() if not k.startswith("_")}
+
+def _apply_local_overrides(data: dict) -> dict:
+    overrides = _load_overrides()
+    updated_map = overrides.get("updated", {})
+    added_list = overrides.get("added", [])
+    deleted_set = set(int(x) for x in overrides.get("deleted", []) if str(x).isdigit())
+
+    headers = list(data.get("headers", []))
+    rows = data.get("rows", [])
+
+    for _, u_row in updated_map.items():
+        for k in u_row.keys():
+            if not k.startswith("_") and k not in headers:
+                headers.append(k)
+    for a_row in added_list:
+        for k in a_row.keys():
+            if not k.startswith("_") and k not in headers:
+                headers.append(k)
+
+    final_rows = []
+    for r in rows:
+        r_num = r.get("_row_num")
+        if r_num in deleted_set:
+            continue
+        row_copy = dict(r)
+        if str(r_num) in updated_map:
+            for k, v in updated_map[str(r_num)].items():
+                if not k.startswith("_"):
+                    row_copy[k] = v
+        for h in headers:
+            if h not in row_copy:
+                row_copy[h] = ""
+        final_rows.append(row_copy)
+
+    for a_row in added_list:
+        r_num = a_row.get("_row_num")
+        if r_num in deleted_set:
+            continue
+        row_copy = dict(a_row)
+        if str(r_num) in updated_map:
+            for k, v in updated_map[str(r_num)].items():
+                if not k.startswith("_"):
+                    row_copy[k] = v
+        for h in headers:
+            if h not in row_copy:
+                row_copy[h] = ""
+        final_rows.append(row_copy)
+
+    return {
+        "headers": headers,
+        "rows": final_rows,
+        "total": len(final_rows),
+        "is_mock": data.get("is_mock", False)
+    }
+
 def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
-    """Appends a new lead row to the Google Sheet. Clears cache."""
+    """Appends a new lead row to the Google Sheet (with local fallback if sheet is Viewer-only). Clears cache."""
     if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
         from app.services import leads_service
         return leads_service.add_lead(lead_data)
-    service = _get_service()
-    sheet_id = _extract_sheet_id(sheet_url)
-    gid = _extract_gid(sheet_url)
     
-    # 1. Fetch spreadsheet metadata to map gid to title
-    metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
-    sheets = metadata.get("sheets", [])
-    target_title = None
-    if gid:
-        for s in sheets:
-            props = s.get("properties", {})
-            if str(props.get("sheetId")) == str(gid):
-                target_title = props.get("title")
-                break
-    if not target_title and sheets:
-        target_title = sheets[0].get("properties", {}).get("title")
-    final_range = target_title if target_title else range_name
-    
-    # 2. Fetch headers to order cell values correctly
-    result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:Z1").execute()
-    values = result.get("values", [])
-    if not values:
-        raise ValueError("Target sheet headers could not be found.")
-    headers = [h.strip() for h in values[0]]
-    deduped_headers = _deduplicate_headers(headers)
-    
-    # 2b. Auto-generate next Lead ID if not present in lead_data
-    if not lead_data.get("Lead ID"):
-        max_num = 1000
-        try:
-            all_leads_dict = fetch_sheet_data(sheet_url, range_name, bypass_cache=True)
-            for row in all_leads_dict.get("rows", []):
-                lid = row.get("Lead ID") or ""
-                if lid.startswith("COG-"):
-                    try:
-                        num = int(lid.split("-")[1])
-                        if num > max_num:
-                            max_num = num
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        lead_data["Lead ID"] = f"COG-{max_num + 1}"
-        
-    # 2c. Ensure the spreadsheet actually has a 'Lead ID' column to store it permanently
-    if "Lead ID" not in deduped_headers:
-        try:
-            updated_headers = headers + ["Lead ID"]
-            service.spreadsheets().values().update(
-                spreadsheetId=sheet_id,
-                range=f"'{final_range}'!A1",
-                valueInputOption="USER_ENTERED",
-                body={"values": [updated_headers]}
-            ).execute()
-            deduped_headers.append("Lead ID")
-        except Exception as header_err:
-            print(f"Failed to append Lead ID header to sheet: {header_err}")
+    clean_data = _clean_lead_payload(lead_data)
 
-    # 3. Format row data to match header ordering
-    row_values = []
-    for dh in deduped_headers:
-        row_values.append(str(lead_data.get(dh, "")).strip())
+    # Auto-generate next Lead ID if not present in clean_data
+    max_num = 1000
+    max_row_num = 500
+    try:
+        all_leads_dict = fetch_sheet_data(sheet_url, range_name, bypass_cache=True)
+        for row in all_leads_dict.get("rows", []):
+            r_num = int(row.get("_row_num") or 0)
+            if r_num > max_row_num:
+                max_row_num = r_num
+            lid = row.get("Lead ID") or ""
+            if lid.startswith("COG-"):
+                try:
+                    num = int(lid.split("-")[1])
+                    if num > max_num:
+                        max_num = num
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    if not clean_data.get("Lead ID"):
+        clean_data["Lead ID"] = f"COG-{max_num + 1}"
+
+    try:
+        service = _get_service()
+        sheet_id = _extract_sheet_id(sheet_url)
+        gid = _extract_gid(sheet_url)
         
-    # 4. Append to sheet
-    body = {
-        "values": [row_values]
-    }
-    last_col_letter = _get_column_letter(len(deduped_headers))
-    service.spreadsheets().values().append(
-        spreadsheetId=sheet_id,
-        range=f"'{final_range}'!A:{last_col_letter}",
-        valueInputOption="USER_ENTERED",
-        body=body
-    ).execute()
-    
-    _cache.clear()
-    return {"ok": True}
+        # 1. Fetch spreadsheet metadata to map gid to title
+        metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        sheets = metadata.get("sheets", [])
+        target_title = None
+        if gid:
+            for s in sheets:
+                props = s.get("properties", {})
+                if str(props.get("sheetId")) == str(gid):
+                    target_title = props.get("title")
+                    break
+        if not target_title and sheets:
+            target_title = sheets[0].get("properties", {}).get("title")
+        final_range = target_title if target_title else range_name
+        
+        # 2. Fetch headers to order cell values correctly
+        result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:ZZ1").execute()
+        values = result.get("values", [])
+        if not values:
+            raise ValueError("Target sheet headers could not be found.")
+        headers = [h.strip() for h in values[0]]
+        deduped_headers = _deduplicate_headers(headers)
+        
+        # 2c. Ensure the spreadsheet has any new columns present in clean_data (including 'Lead ID' or Tender fields)
+        new_cols = [k for k, v in clean_data.items() if k not in deduped_headers and v != ""]
+        if "Lead ID" not in deduped_headers and "Lead ID" not in new_cols:
+            new_cols.append("Lead ID")
+        if new_cols:
+            try:
+                updated_headers = headers + new_cols
+                service.spreadsheets().values().update(
+                    spreadsheetId=sheet_id,
+                    range=f"'{final_range}'!A1",
+                    valueInputOption="USER_ENTERED",
+                    body={"values": [updated_headers]}
+                ).execute()
+                deduped_headers.extend(new_cols)
+            except Exception as header_err:
+                print(f"Failed to append new headers to sheet: {header_err}")
+
+        # 3. Format row data to match header ordering
+        row_values = []
+        for dh in deduped_headers:
+            row_values.append(str(clean_data.get(dh, "")).strip())
+            
+        # 4. Append to sheet
+        body = {
+            "values": [row_values]
+        }
+        last_col_letter = _get_column_letter(len(deduped_headers))
+        service.spreadsheets().values().append(
+            spreadsheetId=sheet_id,
+            range=f"'{final_range}'!A:{last_col_letter}",
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+        
+        _cache.clear()
+        return {"ok": True}
+    except Exception as e:
+        if "403" in str(e) or "permission" in str(e).lower():
+            overrides = _load_overrides()
+            new_row = dict(clean_data)
+            new_row["_row_num"] = max_row_num + 1
+            overrides.setdefault("added", []).append(new_row)
+            _save_overrides(overrides)
+            _cache.clear()
+            return {"ok": True, "local_fallback": True}
+        raise e
 
 def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: dict) -> dict:
-    """Updates a specific row index in the Google Sheet. Clears cache."""
+    """Updates a specific row index in the Google Sheet (with local fallback if sheet is Viewer-only). Clears cache."""
     if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
         from app.services import leads_service
         return leads_service.update_lead(row_num, lead_data)
-    service = _get_service()
-    sheet_id = _extract_sheet_id(sheet_url)
-    gid = _extract_gid(sheet_url)
     
-    metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
-    sheets = metadata.get("sheets", [])
-    target_title = None
-    if gid:
-        for s in sheets:
-            props = s.get("properties", {})
-            if str(props.get("sheetId")) == str(gid):
-                target_title = props.get("title")
-                break
-    if not target_title and sheets:
-        target_title = sheets[0].get("properties", {}).get("title")
-    final_range = target_title if target_title else range_name
-    
-    result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:Z1").execute()
-    values = result.get("values", [])
-    if not values:
-        raise ValueError("Target sheet headers could not be found.")
-    headers = [h.strip() for h in values[0]]
-    deduped_headers = _deduplicate_headers(headers)
-    
-    row_values = []
-    for dh in deduped_headers:
-        row_values.append(str(lead_data.get(dh, "")).strip())
+    clean_data = _clean_lead_payload(lead_data)
+
+    try:
+        service = _get_service()
+        sheet_id = _extract_sheet_id(sheet_url)
+        gid = _extract_gid(sheet_url)
         
-    range_to_update = f"'{final_range}'!A{row_num}"
-    body = {
-        "values": [row_values]
-    }
-    service.spreadsheets().values().update(
-        spreadsheetId=sheet_id,
-        range=range_to_update,
-        valueInputOption="USER_ENTERED",
-        body=body
-    ).execute()
-    
-    _cache.clear()
-    return {"ok": True}
+        metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        sheets = metadata.get("sheets", [])
+        target_title = None
+        if gid:
+            for s in sheets:
+                props = s.get("properties", {})
+                if str(props.get("sheetId")) == str(gid):
+                    target_title = props.get("title")
+                    break
+        if not target_title and sheets:
+            target_title = sheets[0].get("properties", {}).get("title")
+        final_range = target_title if target_title else range_name
+        
+        result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:ZZ1").execute()
+        values = result.get("values", [])
+        if not values:
+            raise ValueError("Target sheet headers could not be found.")
+        headers = [h.strip() for h in values[0]]
+        deduped_headers = _deduplicate_headers(headers)
+        
+        # Auto-add any new non-empty columns (e.g. Tender Detail fields) to sheet headers
+        new_cols = [k for k, v in clean_data.items() if k not in deduped_headers and v != ""]
+        if new_cols:
+            try:
+                updated_headers = headers + new_cols
+                service.spreadsheets().values().update(
+                    spreadsheetId=sheet_id,
+                    range=f"'{final_range}'!A1",
+                    valueInputOption="USER_ENTERED",
+                    body={"values": [updated_headers]}
+                ).execute()
+                deduped_headers.extend(new_cols)
+            except Exception as header_err:
+                print(f"Failed to append new headers on update: {header_err}")
+
+        row_values = []
+        for dh in deduped_headers:
+            row_values.append(str(clean_data.get(dh, "")).strip())
+            
+        range_to_update = f"'{final_range}'!A{row_num}"
+        body = {
+            "values": [row_values]
+        }
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id,
+            range=range_to_update,
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+        
+        _cache.clear()
+        return {"ok": True}
+    except Exception as e:
+        if "403" in str(e) or "permission" in str(e).lower():
+            overrides = _load_overrides()
+            existing = overrides.setdefault("updated", {}).get(str(row_num), {})
+            existing.update(clean_data)
+            overrides["updated"][str(row_num)] = existing
+            _save_overrides(overrides)
+            _cache.clear()
+            return {"ok": True, "local_fallback": True}
+        raise e
 
 def delete_lead_row(sheet_url: str, range_name: str, row_num: int) -> dict:
-    """Deletes a specific row index in the Google Sheet by shifting subsequent rows up. Clears cache."""
+    """Deletes a specific row index in the Google Sheet (with local fallback if sheet is Viewer-only). Clears cache."""
     if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
         from app.services import leads_service
         return leads_service.delete_lead(row_num)
-    service = _get_service()
-    sheet_id = _extract_sheet_id(sheet_url)
-    gid = _extract_gid(sheet_url)
-    
-    # Resolve sheet metadata to get correct sheetId of target tab
-    metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
-    sheets = metadata.get("sheets", [])
-    target_sheet_id = None
-    if gid:
-        for s in sheets:
-            props = s.get("properties", {})
-            if str(props.get("sheetId")) == str(gid):
-                target_sheet_id = props.get("sheetId")
-                break
-    if target_sheet_id is None and sheets:
-        target_sheet_id = sheets[0].get("properties", {}).get("sheetId")
+    try:
+        service = _get_service()
+        sheet_id = _extract_sheet_id(sheet_url)
+        gid = _extract_gid(sheet_url)
         
-    if target_sheet_id is None:
-        raise ValueError("Could not resolve target Google Sheet tab ID.")
-        
-    # Excel rows are 1-indexed, start/end indices in deleteDimension are 0-indexed.
-    body = {
-        "requests": [
-            {
-                "deleteDimension": {
-                    "range": {
-                        "sheetId": int(target_sheet_id),
-                        "dimension": "ROWS",
-                        "startIndex": row_num - 1,
-                        "endIndex": row_num
+        # Resolve sheet metadata to get correct sheetId of target tab
+        metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        sheets = metadata.get("sheets", [])
+        target_sheet_id = None
+        if gid:
+            for s in sheets:
+                props = s.get("properties", {})
+                if str(props.get("sheetId")) == str(gid):
+                    target_sheet_id = props.get("sheetId")
+                    break
+        if target_sheet_id is None and sheets:
+            target_sheet_id = sheets[0].get("properties", {}).get("sheetId")
+            
+        if target_sheet_id is None:
+            raise ValueError("Could not resolve target Google Sheet tab ID.")
+            
+        # Excel rows are 1-indexed, start/end indices in deleteDimension are 0-indexed.
+        body = {
+            "requests": [
+                {
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": int(target_sheet_id),
+                            "dimension": "ROWS",
+                            "startIndex": row_num - 1,
+                            "endIndex": row_num
+                        }
                     }
                 }
-            }
-        ]
-    }
-    service.spreadsheets().batchUpdate(
-        spreadsheetId=sheet_id,
-        body=body
-    ).execute()
-    
-    _cache.clear()
-    return {"ok": True}
+            ]
+        }
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=sheet_id,
+            body=body
+        ).execute()
+        
+        _cache.clear()
+        return {"ok": True}
+    except Exception as e:
+        if "403" in str(e) or "permission" in str(e).lower():
+            overrides = _load_overrides()
+            deleted = overrides.setdefault("deleted", [])
+            if row_num not in deleted:
+                deleted.append(row_num)
+            _save_overrides(overrides)
+            _cache.clear()
+            return {"ok": True, "local_fallback": True}
+        raise e
+

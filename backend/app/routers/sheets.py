@@ -199,6 +199,18 @@ def auth_status(user_session: Optional[str] = Cookie(None)):
     except Exception:
         return {"authenticated": False}
 
+def _format_sheets_error(e: Exception) -> HTTPException:
+    err_str = str(e)
+    if "403" in err_str and ("permission" in err_str.lower() or "caller does not have permission" in err_str.lower()):
+        return HTTPException(
+            status_code=403,
+            detail=(
+                "Google Sheets Permission Error (403): Your authenticated Google account only has 'Viewer' access to this spreadsheet. "
+                "To save or update leads, please open your Google Sheet, click 'Share' in the top right, and grant 'Editor' access to your account."
+            )
+        )
+    return HTTPException(status_code=500, detail=err_str)
+
 @router.post("/lead")
 def add_lead(body: dict, sheet_range: Optional[str] = None):
     cfg = config_service.load_config()
@@ -208,7 +220,7 @@ def add_lead(body: dict, sheet_range: Optional[str] = None):
         res = sheets_service.append_lead_row(sheet_url, range_name, body)
         return res
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _format_sheets_error(e)
 
 @router.put("/lead/{row_num}")
 def update_lead(row_num: int, body: dict, sheet_range: Optional[str] = None):
@@ -219,7 +231,7 @@ def update_lead(row_num: int, body: dict, sheet_range: Optional[str] = None):
         res = sheets_service.update_lead_row(sheet_url, range_name, row_num, body)
         return res
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _format_sheets_error(e)
 
 @router.delete("/lead/{row_num}")
 def delete_lead(row_num: int, sheet_range: Optional[str] = None):
@@ -230,7 +242,7 @@ def delete_lead(row_num: int, sheet_range: Optional[str] = None):
         res = sheets_service.delete_lead_row(sheet_url, range_name, row_num)
         return res
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _format_sheets_error(e)
 
 from fastapi import File, UploadFile
 import io

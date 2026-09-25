@@ -17,3 +17,4 @@ Thumbs.db
 backend/*.db
 scratch_api_data.json
 backend/scratch/
+backend/local_overrides.json

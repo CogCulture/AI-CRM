@@ -12,7 +12,9 @@ import {
   Settings, 
   HelpCircle, 
   LogOut,
-  FileText 
+  FileText,
+  Send,
+  Calendar
 } from "lucide-react";
 import { ThemeToggle } from "../ThemeToggle";
 import { api } from "../../lib/api";
@@ -69,8 +71,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const navigation = [
     { name: "Active Leads", href: "/dashboard?tab=active_leads", icon: LayoutDashboard, key: "active_leads" },
+    { name: "Follow-Ups", href: "/dashboard?tab=followups", icon: Calendar, key: "followups" },
+    { name: "Proposal Tracker", href: "/dashboard?tab=proposals", icon: Send, key: "proposals" },
     { name: "Internal Leads", href: "/dashboard?tab=internal_leads", icon: FileText, key: "internal_leads" },
-    { name: "Tender", href: "/dashboard?tab=tenders", icon: TrendingUp, key: "tenders" },
+    { name: "Tender Management", href: "/dashboard?tab=tenders", icon: TrendingUp, key: "tenders" },
     { name: "Data Platform", href: "/dashboard?tab=data", icon: Database, key: "data" },
   ];
 
