@@ -317,7 +317,7 @@ export default function CRMTable({
       }
     }
 
-    // For Active Leads and Internal Leads, ONLY show the requested columns
+    // For Active Leads and Internal Leads, show core columns including financial estimations
     if (currentTab === "active_leads" || currentTab === "internal_leads") {
       const isAllowed = 
         colLower === "lead id" || 
@@ -325,6 +325,12 @@ export default function CRMTable({
         colLower.includes("company") || 
         colLower === "requirement" || 
         colLower === "stage" || 
+        colLower.includes("revenue") ||
+        colLower.includes("estimation") ||
+        colLower.includes("retainer") ||
+        colLower.includes("value") ||
+        colLower.includes("amount") ||
+        colLower === "source" ||
         colLower === "cog poc" || 
         colLower === "poc" ||
         colLower === "actions"; // keep actions column if any
