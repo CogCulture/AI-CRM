@@ -66,7 +66,7 @@ const parseDate = (dateVal: any): Date | null => {
   const dateStr = String(dateVal).trim();
   if (!dateStr || dateStr === "—" || dateStr.toLowerCase() === "placeholder") return null;
 
-  const parts = dateStr.split(/[-/.]/);
+  const parts = dateStr.replace(/\s+/g, "").split(/[-/.]/);
   if (parts.length === 3) {
     const p0 = parseInt(parts[0], 10);
     const p1 = parseInt(parts[1], 10);
@@ -299,11 +299,17 @@ export default function CRMTable({
   // Inject "Lead ID" at the very beginning of the active columns list (filtering out any duplicates)
   let activeCols = ["Lead ID", ...activeColsRaw.filter((col) => col !== "Lead ID")];
   
-  activeCols = activeCols.filter(col => {
-    const colLower = col.toLowerCase().trim();
-    
+  // Check if we are on Active Leads tab (default tab in dashboard)
+  const isActiveLeadsTab = !isTenderDashboard && (currentTab === "active_leads" || currentTab === "dashboard" || !currentTab);
+
+  if (isActiveLeadsTab) {
+    // Strictly display ONLY the 7 requested columns in this exact order:
+    // Lead ID, Date, Company Name, Requirement, Stage, Status, Cog POC
+    activeCols = ["Lead ID", "Date", "Company", "Requirement", "Stage", "Status", "Cog POC"];
+  } else if (isTenderDashboard) {
     // For Tender Dashboard, remove specific columns
-    if (isTenderDashboard) {
+    activeCols = activeCols.filter(col => {
+      const colLower = col.toLowerCase().trim();
       if (
         colLower === "source" || 
         colLower === "sources" || 
@@ -313,21 +319,15 @@ export default function CRMTable({
       ) {
         return false;
       }
-    }
-
-    // For Active Leads, strictly never display hidden revenue/estimation/retainer columns
-    if (currentTab === "active_leads") {
-      if (
-        colLower.includes("revenue") ||
-        colLower.includes("estimation") ||
-        colLower.includes("retainer")
-      ) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+      return true;
+    });
+  } else if (currentTab === "internal_leads") {
+    // For Internal Leads, show core columns
+    activeCols = activeCols.filter(col => {
+      const colLower = col.toLowerCase().trim();
+      return colLower !== "status (1)";
+    });
+  }
 
   // Sorting logic
   const handleSort = (col: string) => {
@@ -582,6 +582,7 @@ export default function CRMTable({
             <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#161622]/40 text-[10px] font-sans font-semibold uppercase tracking-wider text-gray-500 dark:text-[#888899]">
               {activeCols.map((col, idx) => {
                 const isRight = isNumericColumn(col) && col.toLowerCase() !== "no.";
+                const colLabel = col === "Company" ? "Company Name" : col;
                 return (
                   <th 
                     key={`${col}-${idx}`} 
@@ -591,7 +592,7 @@ export default function CRMTable({
                     onClick={() => handleSort(col)}
                   >
                     <div className={`flex items-center gap-1 ${isRight ? "justify-end" : "justify-start"}`}>
-                      {col}
+                      {colLabel}
                       <ArrowUpDown className="w-3 h-3 text-[#555566]" />
                     </div>
                   </th>
@@ -916,41 +917,156 @@ export default function CRMTable({
       />
 
       {/* Lead Details Modal */}
-      {selectedDetailsRow && (
-        <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" onClick={() => setSelectedDetailsRow(null)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl bg-white dark:bg-[#111118] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-[#161622]/50">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white font-sans flex items-center gap-2">
-                <span>{selectedDetailsRow["Company Name"] || selectedDetailsRow["Company"] || "Lead Details"}</span>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                  {getLeadId(selectedDetailsRow)}
-                </span>
-              </h3>
-              <button 
-                onClick={() => setSelectedDetailsRow(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 hover:bg-gray-200 dark:bg-[#1C1C2D] dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                {headers.filter(h => h !== "_row_num").map(h => (
-                  <div key={h} className="flex flex-col gap-1.5 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] pb-3 last:border-0">
-                    <span className="text-[10px] font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono">
-                      {h}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-[#dedee5] font-sans break-words whitespace-pre-wrap">
-                      {String(selectedDetailsRow[h] || "—")}
-                    </span>
+      {selectedDetailsRow && (() => {
+        const companyName = selectedDetailsRow["Company Name"] || selectedDetailsRow["Company"] || "Lead Details";
+        const leadId = getLeadId(selectedDetailsRow);
+        const rowSource = getRowSource(selectedDetailsRow);
+        const rowStatus = getRowStatus(selectedDetailsRow);
+        const dateVal = formatDisplayDate(selectedDetailsRow["Date"]);
+        const pocName = selectedDetailsRow["POC Name"] || selectedDetailsRow["Name"] || "—";
+        const contactNo = selectedDetailsRow["Contact No."] || selectedDetailsRow["Phone"] || "—";
+        const emailVal = selectedDetailsRow["Email Id"] || selectedDetailsRow["Email"] || selectedDetailsRow["POC email"] || "—";
+        const requirement = selectedDetailsRow["Requirement"] || "—";
+        const stageVal = selectedDetailsRow["Stage"] || "—";
+        const cogPoc = selectedDetailsRow["Cog POC"] || "—";
+        const remarks = selectedDetailsRow["Remarks /Updates"] || selectedDetailsRow["Last Update"] || selectedDetailsRow["Message from Prospect"] || "—";
+
+        // Collect any extra sheet fields not in core cards
+        const coreKeys = new Set([
+          "Company", "Company Name", "Lead ID", "Source", "Lead Source", "Sources",
+          "Status", "Date", "POC Name", "Name", "Contact No.", "Phone",
+          "Email Id", "Email", "POC email", "Requirement", "Stage", "Cog POC",
+          "Remarks /Updates", "Last Update", "Message from Prospect",
+          "S. No.", "S. No. ", "No.",
+        ]);
+
+        const extraFields = Object.entries(selectedDetailsRow).filter(([k, v]) => {
+          if (k.startsWith("_")) return false;
+          if (coreKeys.has(k)) return false;
+          if (isActiveLeadsTab && (k.toLowerCase().includes("revenue") || k.toLowerCase().includes("estimation") || k.toLowerCase().includes("retainer"))) {
+            return false;
+          }
+          return String(v || "").trim() !== "";
+        });
+
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" onClick={() => setSelectedDetailsRow(null)} />
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white dark:bg-[#111118] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[85vh]">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-[#161622]/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-sm">
+                    {companyName.charAt(0).toUpperCase()}
                   </div>
-                ))}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white font-sans">
+                        {companyName}
+                      </h3>
+                      <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
+                        {leadId}
+                      </span>
+                    </div>
+                    {rowSource && (
+                      <span className="text-[10px] font-semibold text-gray-400 dark:text-[#888899]">
+                        Source: {rowSource}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedDetailsRow(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 hover:bg-gray-200 dark:bg-[#1C1C2D] dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-5">
+                {/* Status & Stage Quick Summary */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-gray-50 dark:bg-[#161622]/60 border border-gray-100 dark:border-white/5">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Date</span>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 font-mono">{dateVal}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Status</span>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{rowStatus || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Stage</span>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{stageVal}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Cog POC</span>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{cogPoc}</p>
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono mb-2.5">
+                    Contact Details
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
+                      <span className="text-[10px] text-gray-400 font-mono uppercase">POC Name</span>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{pocName}</p>
+                    </div>
+                    <div className="p-3 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
+                      <span className="text-[10px] text-gray-400 font-mono uppercase">Contact No.</span>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 font-mono">{contactNo}</p>
+                    </div>
+                    <div className="p-3 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
+                      <span className="text-[10px] text-gray-400 font-mono uppercase">Email ID</span>
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 break-all">{emailVal}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Requirement & Remarks */}
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono">
+                      Requirement
+                    </span>
+                    <p className="mt-1 p-3 text-xs text-gray-800 dark:text-gray-200 bg-gray-50/60 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-xl leading-relaxed whitespace-pre-wrap">
+                      {requirement}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono">
+                      Remarks / Updates
+                    </span>
+                    <p className="mt-1 p-3 text-xs text-gray-800 dark:text-gray-200 bg-gray-50/60 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-xl leading-relaxed whitespace-pre-wrap">
+                      {remarks}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Additional Details */}
+                {extraFields.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono mb-2.5">
+                      Additional Sheet Info
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {extraFields.map(([key, val]) => (
+                        <div key={key} className="p-2.5 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/40 dark:bg-white/[0.01]">
+                          <span className="text-[10px] font-mono text-gray-400 uppercase">{key}</span>
+                          <p className="text-xs text-gray-800 dark:text-gray-200 mt-0.5 break-words whitespace-pre-wrap">{String(val)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        );
+      })()}
     </div>
   );
 }

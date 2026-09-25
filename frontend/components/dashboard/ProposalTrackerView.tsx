@@ -151,7 +151,6 @@ export default function ProposalTrackerView({
       // Include any row where stage involves proposal or subsequent pipeline steps
       return (
         stageVal.includes("proposal") || 
-        stageVal.includes("negotiation") || 
         stageVal.includes("portfolio") ||
         ["won", "closed won", "converted"].some(x => stageVal.includes(x)) ||
         ["lost", "closed lost", "dead"].some(x => stageVal.includes(x))
@@ -342,6 +341,7 @@ export default function ProposalTrackerView({
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-blue-500" : ""}`} />
             </button>
           )}
+
         </div>
       </div>
 
@@ -351,7 +351,7 @@ export default function ProposalTrackerView({
         <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
-              Total Proposals Tracked
+              Total Proposals Sent
             </span>
             <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
               <Send className="w-3.5 h-3.5" />
@@ -362,12 +362,12 @@ export default function ProposalTrackerView({
               {metrics.totalSentCount}
             </div>
             <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
-              {metrics.totalPipelineValue > 0 ? formatCurrency(metrics.totalPipelineValue) : "Active proposals"}
+              {formatCurrency(metrics.totalPipelineValue)}
             </div>
           </div>
         </div>
 
-        {/* KPI 2: Under Review / Sent */}
+        {/* KPI 2: Under Review / Pending */}
         <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
@@ -387,27 +387,7 @@ export default function ProposalTrackerView({
           </div>
         </div>
 
-        {/* KPI 3: Proposal to be Sent */}
-        <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
-              Proposal to be Sent
-            </span>
-            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <AlertTriangle className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-sans">
-              {metrics.prepCount}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              In preparation
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 4: Closed Won & Win Rate */}
+        {/* KPI 3: Closed Won & Win Rate */}
         <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
@@ -427,7 +407,27 @@ export default function ProposalTrackerView({
               </span>
             </div>
             <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
-              {metrics.wonValue > 0 ? `${formatCurrency(metrics.wonValue)} won` : `${metrics.lostCount} closed lost`}
+              {formatCurrency(metrics.wonValue)} won
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 4: Avg Proposal Size */}
+        <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
+              Avg Proposal Size
+            </span>
+            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white font-sans">
+              {formatCurrency(metrics.avgProposalValue)}
+            </div>
+            <div className="text-xs text-rose-500 mt-0.5">
+              {metrics.lostCount} proposals lost
             </div>
           </div>
         </div>
@@ -657,6 +657,7 @@ export default function ProposalTrackerView({
                 <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#161622]/40 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#888899]">
                   <th className="py-3 px-4">Lead ID</th>
                   <th className="py-3 px-4">Company</th>
+                  <th className="py-3 px-4 text-right">Proposal Value</th>
                   <th className="py-3 px-4">Current Stage</th>
                   <th className="py-3 px-4">Client Status</th>
                   <th className="py-3 px-4">Proposal Date</th>
@@ -671,6 +672,7 @@ export default function ProposalTrackerView({
                     const rowNum = lead["_row_num"] || lead["Lead ID"];
                     const company = String(lead[companyCol] || "Unnamed Lead");
                     const leadId = String(lead["Lead ID"] || `COG-${1000 + Number(rowNum)}`);
+                    const val = String(lead[valueCol] || "—");
                     const stage = String(lead[stageCol] || "");
                     const status = String(lead[statusCol] || "");
                     const dateVal = lead[dateCol] || lead[deadlineCol] || "—";
@@ -694,13 +696,14 @@ export default function ProposalTrackerView({
                             {company}
                           </button>
                         </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {val}
+                        </td>
                         <td className="py-3 px-4">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                               colId === "won"
                                 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-                                : colId === "prep"
-                                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40"
                                 : colId === "lost"
                                 ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40"
                                 : "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40"
@@ -784,7 +787,7 @@ export default function ProposalTrackerView({
                   })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-gray-400 dark:text-[#555566] text-xs">
+                    <td colSpan={9} className="py-12 text-center text-gray-400 dark:text-[#555566] text-xs">
                       No proposals match the current filter criteria.
                     </td>
                   </tr>
