@@ -17,7 +17,7 @@ import TenderDashboardView from "../../components/dashboard/TenderDashboardView"
 import { api } from "../../lib/api";
 import { SheetData, DashboardSummary, GraphConfig } from "../../lib/types";
 import { toast } from "sonner";
-import { RefreshCw, Search, Bell, X, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Search, Bell, X, AlertCircle, Eye, EyeOff, Layers, FileSpreadsheet } from "lucide-react";
 
 // Helper function to check if a date string is today's date
 const isToday = (dateVal: any): boolean => {
@@ -100,6 +100,9 @@ function DashboardContent() {
   const tab = searchParams.get("tab") || "dashboard";
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [sheetData, setSheetData] = useState<SheetData | null>(null);
+  const [septSheetData, setSeptSheetData] = useState<SheetData | null>(null);
+  const [activeSheetSubTab, setActiveSheetSubTab] = useState<"sept" | "oct" | "both">("sept");
+  const [activeTargetTab, setActiveTargetTab] = useState<string>("Active Leads from Sept");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
@@ -115,31 +118,26 @@ function DashboardContent() {
 
   async function loadData(showToast = false, bypassCache = false) {
     try {
-      // Target range based on tab: "Internal Leads" for internal leads, "Active Leads" for Active Leads & Tender
-      const targetTabRange = tab === "internal_leads" ? "Internal Leads" : "Active Leads";
+      if (tab === "internal_leads") {
+        const [sum, data] = await Promise.all([
+          api.getDashboardSummary(bypassCache),
+          api.getSheetData(bypassCache, "Internal Leads"),
+        ]);
+        setSummary(sum);
+        setSheetData(data);
+      } else {
+        const [sum, legacyData, septData] = await Promise.all([
+          api.getDashboardSummary(bypassCache),
+          api.getSheetData(bypassCache, "Active Leads"),
+          api.getSheetData(bypassCache, "Active Leads from Sept"),
+        ]);
+        setSummary(sum);
+        setSheetData(legacyData);
+        setSeptSheetData(septData);
+      }
 
-      const [sum, data] = await Promise.all([
-        api.getDashboardSummary(bypassCache),
-        api.getSheetData(bypassCache, targetTabRange),
-      ]);
-      setSummary(sum);
-      setSheetData(data);
       if (showToast) {
         toast.success("CRM dashboard synchronized");
-      }
-      
-      // Check if there are due leads and open the panel automatically
-      if (data && data.rows) {
-        const deadlineHeader = data.headers.find(h => {
-          const hl = h.toLowerCase();
-          return hl.includes("deadline") || hl.includes("due");
-        }) || "";
-        if (deadlineHeader) {
-          const due = data.rows.filter(row => isToday(row[deadlineHeader]));
-          if (due.length > 0) {
-            setShowAlertPanel(true);
-          }
-        }
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load CRM data");
@@ -211,15 +209,25 @@ function DashboardContent() {
     });
   };
 
-  const handleAddLead = () => {
+  const handleAddLead = (targetSheet?: string) => {
     setSelectedLead(null);
-    setModalTitle("Add New Lead");
+    const chosenTab = typeof targetSheet === "string" 
+      ? targetSheet 
+      : tab === "internal_leads" 
+      ? "Internal Leads" 
+      : activeSheetSubTab === "oct" 
+      ? "Active Leads" 
+      : "Active Leads from Sept";
+    setActiveTargetTab(chosenTab);
+    setModalTitle(`Add New Lead (${chosenTab})`);
     setIsLeadModalOpen(true);
   };
 
   const handleEditLead = (row: Record<string, any>) => {
     setSelectedLead(row);
-    setModalTitle("Edit Lead");
+    const rowTab = row._sheet_tab || (tab === "internal_leads" ? "Internal Leads" : activeSheetSubTab === "oct" ? "Active Leads" : "Active Leads from Sept");
+    setActiveTargetTab(rowTab);
+    setModalTitle(`Edit Lead (${rowTab})`);
     setIsLeadModalOpen(true);
   };
 
@@ -236,7 +244,8 @@ function DashboardContent() {
 
     try {
       setRefreshing(true);
-      await api.deleteLead(rowNum);
+      const rowTab = row._sheet_tab || (tab === "internal_leads" ? "Internal Leads" : activeSheetSubTab === "oct" ? "Active Leads" : "Active Leads from Sept");
+      await api.deleteLead(rowNum, rowTab);
       toast.success("Lead deleted successfully");
       await loadData(false, true);
     } catch (err: any) {
@@ -250,11 +259,12 @@ function DashboardContent() {
     try {
       setRefreshing(true);
       const targetRowNum = leadDataInput._row_num || (selectedLead && selectedLead._row_num);
+      const rowTab = leadDataInput._sheet_tab || (selectedLead && selectedLead._sheet_tab) || activeTargetTab || "Active Leads from Sept";
       if (targetRowNum) {
-        await api.updateLead(targetRowNum, leadDataInput);
+        await api.updateLead(targetRowNum, leadDataInput, rowTab);
         toast.success("Lead updated successfully");
       } else {
-        await api.addLead(leadDataInput);
+        await api.addLead(leadDataInput, rowTab);
         toast.success("Lead added successfully");
       }
       await loadData(false, true);
@@ -275,7 +285,8 @@ function DashboardContent() {
         return;
       }
       const updatedRow = { ...row, Stage: newStage };
-      await api.updateLead(rowNum, updatedRow);
+      const rowTab = row._sheet_tab || "Active Leads";
+      await api.updateLead(rowNum, updatedRow, rowTab);
       toast.success(`Proposal stage moved to "${newStage}"`);
       await loadData(false, true);
     } catch (err: any) {
@@ -285,15 +296,39 @@ function DashboardContent() {
     }
   };
 
-  const isConfigured = summary?.configured || sheetData?.configured || (sheetData && sheetData.rows.length > 0);
+  const isConfigured = summary?.configured || sheetData?.configured || (sheetData && sheetData.rows.length > 0) || (septSheetData && septSheetData.rows.length > 0);
 
-  // Dynamic default graph configuration based on sheet headers
-  const dateCol = sheetData?.headers.find(h => h.toLowerCase().includes("date")) || sheetData?.headers[5] || "";
-  const valCol = sheetData?.headers.find(h => {
+  const isTendersTab = tab === "tenders";
+  const isInternalLeadsTab = tab === "internal_leads";
+  const isActiveLeadsView = !isTendersTab && !isInternalLeadsTab && !["data", "followups", "proposals", "help"].includes(tab);
+
+  // Select active sheet dataset for Active Leads view
+  const currentActiveSheetData = React.useMemo<SheetData | null>(() => {
+    if (!isActiveLeadsView) return sheetData;
+    if (activeSheetSubTab === "sept" && septSheetData) return septSheetData;
+    if (activeSheetSubTab === "oct" && sheetData) return sheetData;
+    if (activeSheetSubTab === "both" && septSheetData && sheetData) {
+      const mergedHeaders = Array.from(new Set([...septSheetData.headers, ...sheetData.headers]));
+      return {
+        ...septSheetData,
+        headers: mergedHeaders,
+        rows: [...septSheetData.rows, ...sheetData.rows],
+        total: septSheetData.total + sheetData.total,
+        hidden_count: (septSheetData.hidden_count || 0) + (sheetData.hidden_count || 0),
+        unhidden_count: (septSheetData.unhidden_count || 0) + (sheetData.unhidden_count || 0),
+      };
+    }
+    return septSheetData || sheetData;
+  }, [isActiveLeadsView, activeSheetSubTab, septSheetData, sheetData]);
+
+  // Dynamic default graph configuration based on active sheet headers
+  const dateCol = currentActiveSheetData?.headers.find(h => h.toLowerCase().includes("date")) || currentActiveSheetData?.headers[1] || "";
+  // Do not show revenue estimations in Active Leads
+  const valCol = isActiveLeadsView ? "" : (currentActiveSheetData?.headers.find(h => {
     const hl = h.toLowerCase();
     return hl.includes("value") || hl.includes("amount") || hl.includes("revenue") || hl.includes("deal size");
-  }) || sheetData?.headers[3] || "";
-  const stageCol = sheetData?.headers.find(h => h.toLowerCase().includes("stage") || h.toLowerCase().includes("status")) || sheetData?.headers[2] || "";
+  }) || "");
+  const stageCol = currentActiveSheetData?.headers.find(h => h.toLowerCase().includes("status") || h.toLowerCase().includes("stage")) || currentActiveSheetData?.headers[2] || "";
 
   const getMonthName = (m: number): string => {
     const months = [
@@ -305,10 +340,11 @@ function DashboardContent() {
 
   // Get unique months list for dropdown
   const uniqueMonths = React.useMemo(() => {
-    if (!sheetData || !sheetData.rows || !dateCol) return [];
+    if (!currentActiveSheetData || !currentActiveSheetData.rows || !dateCol) return [];
     const monthsMap: Record<string, string> = {};
     
-    sheetData.rows.forEach(row => {
+    currentActiveSheetData.rows.forEach(row => {
+      if (!includeArchived && row._is_hidden) return;
       const dateVal = row[dateCol];
       if (!dateVal) return;
       const parts = String(dateVal).trim().split(/[-/.]/);
@@ -335,33 +371,42 @@ function DashboardContent() {
         key,
         label: monthsMap[key]
       }));
-  }, [sheetData, dateCol]);
+  }, [currentActiveSheetData, dateCol, includeArchived]);
 
-  const isTendersTab = tab === "tenders";
-  const isInternalLeadsTab = tab === "internal_leads";
+  const isRowTender = (row: Record<string, any>) => {
+    for (const [k, v] of Object.entries(row)) {
+      const kl = k.toLowerCase().trim();
+      if ((kl === "source" || kl === "sources" || kl.includes("source") || kl.includes("lead source")) && String(v || "").trim().toLowerCase() === "tender") {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Unhidden non-tender rows for "Active Leads from Sept"
+  const septActiveRows = React.useMemo(() => {
+    if (!septSheetData?.rows) return [];
+    return septSheetData.rows.filter(row => {
+      if (!includeArchived && row._is_hidden) return false;
+      return !isRowTender(row);
+    });
+  }, [septSheetData, includeArchived]);
+
+  // Unhidden non-tender rows for "Active Leads"
+  const legacyActiveRows = React.useMemo(() => {
+    if (!sheetData?.rows) return [];
+    return sheetData.rows.filter(row => {
+      if (!includeArchived && row._is_hidden) return false;
+      return !isRowTender(row);
+    });
+  }, [sheetData, includeArchived]);
 
   // Filter rows by tab (lead type) and selected month
   const filteredRows = React.useMemo(() => {
-    if (!sheetData || !sheetData.rows) return [];
-    
-    const sourceColName = sheetData.headers.find(h => {
-      const hl = h.toLowerCase().trim();
-      return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
-    }) || "Source";
+    const baseData = isActiveLeadsView ? currentActiveSheetData : sheetData;
+    if (!baseData || !baseData.rows) return [];
 
-    const isRowTender = (row: Record<string, any>) => {
-      const val = String(row[sourceColName] || "").trim().toLowerCase();
-      if (val === "tender") return true;
-      for (const [k, v] of Object.entries(row)) {
-        const kl = k.toLowerCase().trim();
-        if ((kl === "source" || kl === "sources" || kl.includes("source") || kl.includes("lead source")) && String(v || "").trim().toLowerCase() === "tender") {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    let rows = sheetData.rows;
+    let rows = baseData.rows;
 
     // By default, strictly filter out hidden / collapsed rows from Google Sheets (archive)
     if (!includeArchived) {
@@ -402,35 +447,23 @@ function DashboardContent() {
       }
       return false;
     });
-  }, [sheetData, selectedMonth, dateCol, isTendersTab, isInternalLeadsTab, includeArchived]);
+  }, [currentActiveSheetData, sheetData, selectedMonth, dateCol, isTendersTab, isInternalLeadsTab, isActiveLeadsView, includeArchived]);
 
   const filteredSheetData = React.useMemo<SheetData | null>(() => {
-    if (!sheetData) return null;
+    const baseData = isActiveLeadsView ? currentActiveSheetData : sheetData;
+    if (!baseData) return null;
     return {
-      ...sheetData,
+      ...baseData,
       rows: filteredRows
     };
-  }, [sheetData, filteredRows]);
+  }, [currentActiveSheetData, sheetData, isActiveLeadsView, filteredRows]);
 
   // Active Leads non-tender sheet data slice (used by Proposal Tracker & Follow-Ups to exclude Tenders)
   const activeLeadsSheetData = React.useMemo<SheetData | null>(() => {
     if (!sheetData || !sheetData.rows) return null;
-    const sourceColName = sheetData.headers.find(h => {
-      const hl = h.toLowerCase().trim();
-      return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
-    }) || "Source";
-
     const nonTenders = sheetData.rows.filter(row => {
       if (!includeArchived && row._is_hidden) return false;
-      const val = String(row[sourceColName] || "").trim().toLowerCase();
-      if (val === "tender") return false;
-      for (const [k, v] of Object.entries(row)) {
-        const kl = k.toLowerCase().trim();
-        if ((kl === "source" || kl === "sources" || kl.includes("source") || kl.includes("lead source")) && String(v || "").trim().toLowerCase() === "tender") {
-          return false;
-        }
-      }
-      return true;
+      return !isRowTender(row);
     });
 
     return {
@@ -442,7 +475,8 @@ function DashboardContent() {
 
   // Calculate display KPIs dynamically based on filtered rows
   const displayKpis = React.useMemo(() => {
-    if (!sheetData) return [];
+    const targetData = isActiveLeadsView ? (currentActiveSheetData || sheetData) : sheetData;
+    if (!targetData) return [];
     const rows = filteredRows;
     const totalRows = rows.length;
 
@@ -452,11 +486,11 @@ function DashboardContent() {
 
     let totalValue = 0;
     const uniqueCompanies = new Set<string>();
-    const companyCol = sheetData.headers.find(h => h.toLowerCase() === "company" || h.toLowerCase().includes("company"));
+    const companyCol = targetData.headers.find(h => h.toLowerCase() === "company" || h.toLowerCase().includes("company"));
 
     rows.forEach(row => {
-      const statusColName = sheetData.headers.find(h => h.toLowerCase() === "status" || h.toLowerCase().includes("status")) || "";
-      const stageColName = sheetData.headers.find(h => h.toLowerCase().includes("stage")) || "";
+      const statusColName = targetData.headers.find(h => h.toLowerCase() === "status" || h.toLowerCase().includes("status")) || "";
+      const stageColName = targetData.headers.find(h => h.toLowerCase().includes("stage")) || "";
       
       let isWonOrLost = false;
       const stgVals: string[] = [];
@@ -500,14 +534,14 @@ function DashboardContent() {
     } else if (companyCol) {
       kpisList.push({ label: "Unique Companies", value: uniqueCompanies.size.toLocaleString("en-IN"), delta: "+5%" });
     } else {
-      kpisList.push({ label: "Pipeline Value", value: "₹0", delta: "+0%" });
+      kpisList.push({ label: "Unique Companies", value: totalRows.toLocaleString("en-IN"), delta: "+0%" });
     }
 
     let activeCount = 0;
     let closedWonCount = 0;
     let coldCount = 0;
-    const statusColName = sheetData.headers.find(h => h.toLowerCase() === "status" || h.toLowerCase().includes("status")) || "";
-    const stageColName = sheetData.headers.find(h => h.toLowerCase().includes("stage")) || "";
+    const statusColName = targetData.headers.find(h => h.toLowerCase() === "status" || h.toLowerCase().includes("status")) || "";
+    const stageColName = targetData.headers.find(h => h.toLowerCase().includes("stage")) || "";
 
     rows.forEach(row => {
       const stgVals: string[] = [];
@@ -549,7 +583,7 @@ function DashboardContent() {
     kpisList.push({ label: "Cold Leads", value: coldCount.toLocaleString("en-IN"), delta: "+0%" });
 
     return kpisList;
-  }, [filteredRows, sheetData, valCol]);
+  }, [filteredRows, currentActiveSheetData, sheetData, isActiveLeadsView, valCol]);
 
   const defaultLineGraph: GraphConfig = {
     id: "default-line",
@@ -759,8 +793,8 @@ function DashboardContent() {
           )}
 
           {/* Dashboard Title & Actions */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <h1 className="font-sans text-2xl text-gray-900 dark:text-white font-bold tracking-tight">
                 {tab === "tenders" 
                   ? "Tender" 
@@ -772,6 +806,51 @@ function DashboardContent() {
                   ? "Help"
                   : "Active Leads"}
               </h1>
+
+              {/* Sheet Tab Switcher for Active Leads */}
+              {isActiveLeadsView && septSheetData && (
+                <div className="flex items-center p-1 bg-gray-100 dark:bg-[#111118] rounded-xl border border-gray-200 dark:border-white/10 text-xs font-semibold">
+                  <button
+                    onClick={() => setActiveSheetSubTab("sept")}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeSheetSubTab === "sept"
+                        ? "bg-white dark:bg-[#1C1C2D] text-emerald-600 dark:text-emerald-400 shadow-sm font-bold"
+                        : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Active Leads from Sept</span>
+                    <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-[10px]">
+                      {septActiveRows.length}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSheetSubTab("oct")}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeSheetSubTab === "oct"
+                        ? "bg-white dark:bg-[#1C1C2D] text-emerald-600 dark:text-emerald-400 shadow-sm font-bold"
+                        : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Active Leads</span>
+                    <span className="px-1.5 py-0.5 bg-gray-500/10 text-gray-600 dark:text-gray-400 rounded-full text-[10px]">
+                      {legacyActiveRows.length}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSheetSubTab("both")}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeSheetSubTab === "both"
+                        ? "bg-white dark:bg-[#1C1C2D] text-emerald-600 dark:text-emerald-400 shadow-sm font-bold"
+                        : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>All Active Sheets</span>
+                    <span className="px-1.5 py-0.5 bg-gray-500/10 text-gray-600 dark:text-gray-400 rounded-full text-[10px]">
+                      {septActiveRows.length + legacyActiveRows.length}
+                    </span>
+                  </button>
+                </div>
+              )}
               
               {sheetData && uniqueMonths.length > 0 && (
                 <div className="relative">
@@ -793,7 +872,7 @@ function DashboardContent() {
               {!sheetData?.is_mock && (
                 <>
                   {/* Unhidden vs All Leads Toggle */}
-                  {sheetData && (sheetData.hidden_count || 0) > 0 && (
+                  {currentActiveSheetData && (currentActiveSheetData.hidden_count || 0) > 0 && (
                     <button
                       onClick={() => setIncludeArchived(!includeArchived)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer border ${
@@ -801,7 +880,7 @@ function DashboardContent() {
                           ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 shadow-xs"
                           : "bg-white dark:bg-[#111118] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300"
                       }`}
-                      title={includeArchived ? "Switch back to viewing only unhidden active leads" : `Include ${sheetData.hidden_count} hidden/archived rows from Google Sheets`}
+                      title={includeArchived ? "Switch back to viewing only unhidden active leads" : `Include ${currentActiveSheetData.hidden_count} hidden/archived rows from Google Sheets`}
                     >
                       {includeArchived ? (
                         <>
@@ -811,9 +890,9 @@ function DashboardContent() {
                       ) : (
                         <>
                           <EyeOff className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Active Leads Only ({filteredRows.length})</span>
+                          <span>Unhidden Only ({filteredRows.length})</span>
                           <span className="text-[10px] text-gray-400 font-normal">
-                            ({sheetData.hidden_count} hidden)
+                            ({currentActiveSheetData.hidden_count} hidden)
                           </span>
                         </>
                       )}
@@ -821,7 +900,7 @@ function DashboardContent() {
                   )}
 
                   <button
-                    onClick={handleAddLead}
+                    onClick={() => handleAddLead()}
                     className="px-3 py-1.5 bg-white dark:bg-[#111118] hover:bg-gray-55 dark:hover:bg-[#1C1C2D] text-gray-700 dark:text-white border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer"
                   >
                     + Add Lead
@@ -912,13 +991,70 @@ function DashboardContent() {
           </div>
 
           {/* Row 3: Campaign Performance Table (Full Width) */}
-          <div className="w-full">
-            {sheetData && (
+          <div className="w-full space-y-6">
+            {isActiveLeadsView && activeSheetSubTab === "both" && septSheetData && sheetData ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Active Leads from Sept ({septActiveRows.length} Leads)
+                    </h2>
+                    <button
+                      onClick={() => handleAddLead("Active Leads from Sept")}
+                      className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      + Add to Active Leads from Sept
+                    </button>
+                  </div>
+                  <CRMTable
+                    headers={septSheetData.headers}
+                    rows={septActiveRows}
+                    visibleColumns={[]}
+                    columnOrder={[]}
+                    onSaveConfig={handleSaveTableConfig}
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    onEdit={!sheetData?.is_mock ? handleEditLead : undefined}
+                    onDelete={!sheetData?.is_mock ? handleDeleteLead : undefined}
+                    isTenderDashboard={false}
+                    currentTab={tab}
+                  />
+                </div>
+                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-white/10">
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                      Active Leads ({legacyActiveRows.length} Unhidden Leads)
+                    </h2>
+                    <button
+                      onClick={() => handleAddLead("Active Leads")}
+                      className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      + Add to Active Leads
+                    </button>
+                  </div>
+                  <CRMTable
+                    headers={sheetData.headers}
+                    rows={legacyActiveRows}
+                    visibleColumns={[]}
+                    columnOrder={[]}
+                    onSaveConfig={handleSaveTableConfig}
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    onEdit={!sheetData?.is_mock ? handleEditLead : undefined}
+                    onDelete={!sheetData?.is_mock ? handleDeleteLead : undefined}
+                    isTenderDashboard={false}
+                    currentTab={tab}
+                  />
+                </div>
+              </>
+            ) : sheetData ? (
               <CRMTable
-                headers={sheetData.headers}
+                headers={(isActiveLeadsView ? currentActiveSheetData?.headers : sheetData.headers) || sheetData.headers}
                 rows={filteredRows}
-                visibleColumns={summary?.visible_columns || []}
-                columnOrder={summary?.column_order || []}
+                visibleColumns={isActiveLeadsView && activeSheetSubTab === "sept" ? [] : (summary?.visible_columns || [])}
+                columnOrder={isActiveLeadsView && activeSheetSubTab === "sept" ? [] : (summary?.column_order || [])}
                 onSaveConfig={handleSaveTableConfig}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
@@ -927,7 +1063,7 @@ function DashboardContent() {
                 isTenderDashboard={isTendersTab}
                 currentTab={tab}
               />
-            )}
+            ) : null}
           </div>
 
           {/* Row 3: Extra Graphs (If any) */}
@@ -953,7 +1089,7 @@ function DashboardContent() {
             <GraphBuilder
               isOpen={isBuilderOpen}
               onClose={() => setIsBuilderOpen(false)}
-              headers={sheetData.headers}
+              headers={(isActiveLeadsView ? currentActiveSheetData?.headers : sheetData.headers) || sheetData.headers}
               rows={filteredRows}
               onSave={handleAddGraph}
             />
@@ -964,7 +1100,7 @@ function DashboardContent() {
             <LeadFormModal
               isOpen={isLeadModalOpen}
               onClose={() => setIsLeadModalOpen(false)}
-              headers={sheetData.headers}
+              headers={(isActiveLeadsView && activeTargetTab === "Active Leads from Sept" && septSheetData ? septSheetData.headers : sheetData.headers)}
               initialData={selectedLead}
               onSave={handleSaveLead}
               title={modalTitle}

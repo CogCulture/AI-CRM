@@ -158,13 +158,31 @@ def _fetch_public_csv(sheet_url: str) -> dict:
         
     return {"headers": headers, "rows": normalized, "total": len(normalized), "is_mock": False}
 
+def _resolve_target_sheet(sheets: list, range_name: str, gid: str):
+    """Resolve target sheet properties dict by matching range_name first, then gid, then first sheet."""
+    if not sheets:
+        return None
+    if range_name:
+        rn_clean = range_name.strip().lower()
+        for s in sheets:
+            title = s.get("properties", {}).get("title", "")
+            if title.strip().lower() == rn_clean:
+                return s
+    if gid:
+        for s in sheets:
+            props = s.get("properties", {})
+            if str(props.get("sheetId")) == str(gid):
+                return s
+    return sheets[0]
+
+
 def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: bool = False) -> dict:
     """Returns { headers: [...], rows: [[...], ...], total: int }"""
     if not sheet_url or sheet_url.strip() in ["", "mock", "local_db"]:
         from app.services import leads_service
         return leads_service.get_all_leads()
 
-    cache_key = f"{sheet_url}:{range_name}"
+    cache_key = f"{sheet_url}:{range_name.strip() if range_name else ''}"
     if not bypass_cache and cache_key in _cache:
         return _cache[cache_key]
 
@@ -175,7 +193,6 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
         service = _get_service()
 
         # 1. Fetch spreadsheet metadata to discover sheet tabs
-        sheet_title_map = {}
         first_sheet_title = range_name
         try:
             metadata = service.spreadsheets().get(
@@ -184,50 +201,31 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             ).execute()
             
             sheets = metadata.get("sheets", [])
-            target_sheet = None
-            
             if sheets:
                 first_sheet_title = sheets[0].get("properties", {}).get("title") or "Sheet1"
-                sheet_title_map = {
-                    s.get("properties", {}).get("title", "").strip().lower(): s.get("properties", {}).get("title")
-                    for s in sheets if s.get("properties", {}).get("title")
-                }
             
-            # Match requested range_name against existing sheet titles
-            if range_name and range_name.strip().lower() in sheet_title_map:
-                actual_title = sheet_title_map[range_name.strip().lower()]
-                for s in sheets:
-                    if s.get("properties", {}).get("title") == actual_title:
-                        target_sheet = s
-                        break
-            elif gid:
-                for s in sheets:
-                    props = s.get("properties", {})
-                    if str(props.get("sheetId")) == str(gid):
-                        target_sheet = s
-                        break
-            
-            if not target_sheet and sheets:
-                target_sheet = sheets[0]
-                
+            target_sheet = _resolve_target_sheet(sheets, range_name, gid)
             final_range = target_sheet.get("properties", {}).get("title") if target_sheet else range_name
         except Exception as meta_err:
             print(f"Failed to fetch sheet metadata (falling back to range '{range_name}'): {meta_err}")
             final_range = range_name
 
-        # 2. Fetch row visibility metadata (hiddenByUser, hiddenByFilter)
+        # 2. Fetch row & column visibility metadata (hiddenByUser, hiddenByFilter)
         row_metadata_list = []
+        col_metadata_list = []
         try:
             meta_res = service.spreadsheets().get(
                 spreadsheetId=sheet_id,
                 ranges=[final_range],
-                fields="sheets.data.rowMetadata(hiddenByFilter,hiddenByUser)"
+                fields="sheets.data(rowMetadata(hiddenByFilter,hiddenByUser),columnMetadata(hiddenByFilter,hiddenByUser))"
             ).execute()
             sheets_data = meta_res.get("sheets", [])
-            if sheets_data and sheets_data[0].get("data") and sheets_data[0]["data"][0].get("rowMetadata"):
-                row_metadata_list = sheets_data[0]["data"][0]["rowMetadata"]
+            if sheets_data and sheets_data[0].get("data"):
+                grid_data = sheets_data[0]["data"][0]
+                row_metadata_list = grid_data.get("rowMetadata", [])
+                col_metadata_list = grid_data.get("columnMetadata", [])
         except Exception as meta_err:
-            print(f"Failed to fetch row visibility metadata: {meta_err}")
+            print(f"Failed to fetch row/column visibility metadata: {meta_err}")
 
         # 3. Fetch values with fallback if specified range does not exist
         try:
@@ -251,10 +249,21 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             data = {"headers": [], "rows": [], "total": 0, "is_mock": False}
         else:
             raw_headers = values[0]
-            headers = _deduplicate_headers(raw_headers)
-            has_lead_id = "Lead ID" in headers
-            if not has_lead_id:
-                headers = ["Lead ID"] + headers
+            all_deduped_headers = _deduplicate_headers(raw_headers)
+
+            # Identify hidden columns in Google Sheets
+            hidden_col_indices = set()
+            hidden_columns = []
+            for col_idx, dh in enumerate(all_deduped_headers):
+                if col_idx < len(col_metadata_list):
+                    cm = col_metadata_list[col_idx]
+                    if cm.get("hiddenByUser", False) or cm.get("hiddenByFilter", False):
+                        hidden_col_indices.add(col_idx)
+                        hidden_columns.append(dh)
+
+            visible_headers = [dh for idx, dh in enumerate(all_deduped_headers) if idx not in hidden_col_indices]
+            has_lead_id = "Lead ID" in visible_headers
+            headers = visible_headers if has_lead_id else ["Lead ID"] + visible_headers
             
             rows = values[1:]
             normalized = []
@@ -265,8 +274,10 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                 row_has_data = False
                 
                 for new_idx, h in enumerate(raw_headers):
+                    if new_idx in hidden_col_indices:
+                        continue
                     val = row[new_idx].strip() if new_idx < len(row) else ""
-                    header_key = headers[new_idx + (1 if not has_lead_id else 0)]
+                    header_key = all_deduped_headers[new_idx]
                     row_dict[header_key] = val
                     if val != "":
                         row_has_data = True
@@ -280,6 +291,7 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                     if len(non_empty_cols) < 2:
                         continue
                     row_dict["_row_num"] = grid_row_idx + 1
+                    row_dict["_sheet_tab"] = final_range.strip()
                     
                     # Detect if row is hidden or collapsed in Google Sheet
                     meta_info = row_metadata_list[grid_row_idx] if grid_row_idx < len(row_metadata_list) else {}
@@ -288,7 +300,8 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
 
                     # Backfill/inject Lead ID
                     if not row_dict.get("Lead ID"):
-                        row_dict["Lead ID"] = f"COG-{1000 + row_dict['_row_num']}"
+                        prefix = "SEP" if "sept" in final_range.lower() else "COG"
+                        row_dict["Lead ID"] = f"{prefix}-{1000 + row_dict['_row_num']}"
                     
                     normalized.append(row_dict)
             data = _apply_local_overrides({
@@ -297,6 +310,8 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                 "total": len(normalized), 
                 "hidden_count": sum(1 for r in normalized if r.get("_is_hidden")),
                 "unhidden_count": sum(1 for r in normalized if not r.get("_is_hidden")),
+                "hidden_columns": hidden_columns,
+                "sheet_tab": final_range.strip(),
                 "is_mock": False
             })
             
@@ -347,15 +362,16 @@ def _apply_local_overrides(data: dict) -> dict:
     deleted_set = set(int(x) for x in overrides.get("deleted", []) if str(x).isdigit())
 
     headers = list(data.get("headers", []))
+    hidden_columns = set(data.get("hidden_columns", []))
     rows = data.get("rows", [])
 
     for _, u_row in updated_map.items():
         for k in u_row.keys():
-            if not k.startswith("_") and k not in headers:
+            if not k.startswith("_") and k not in headers and k not in hidden_columns:
                 headers.append(k)
     for a_row in added_list:
         for k in a_row.keys():
-            if not k.startswith("_") and k not in headers:
+            if not k.startswith("_") and k not in headers and k not in hidden_columns:
                 headers.append(k)
 
     final_rows = []
@@ -366,7 +382,7 @@ def _apply_local_overrides(data: dict) -> dict:
         row_copy = dict(r)
         if str(r_num) in updated_map:
             for k, v in updated_map[str(r_num)].items():
-                if not k.startswith("_"):
+                if not k.startswith("_") and k not in hidden_columns:
                     row_copy[k] = v
         for h in headers:
             if h not in row_copy:
@@ -380,7 +396,7 @@ def _apply_local_overrides(data: dict) -> dict:
         row_copy = dict(a_row)
         if str(r_num) in updated_map:
             for k, v in updated_map[str(r_num)].items():
-                if not k.startswith("_"):
+                if not k.startswith("_") and k not in hidden_columns:
                     row_copy[k] = v
         for h in headers:
             if h not in row_copy:
@@ -395,6 +411,8 @@ def _apply_local_overrides(data: dict) -> dict:
         "total": len(final_rows),
         "hidden_count": hidden_count,
         "unhidden_count": unhidden_count,
+        "hidden_columns": list(hidden_columns),
+        "sheet_tab": data.get("sheet_tab", ""),
         "is_mock": data.get("is_mock", False)
     }
 
@@ -416,7 +434,7 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
             if r_num > max_row_num:
                 max_row_num = r_num
             lid = row.get("Lead ID") or ""
-            if lid.startswith("COG-"):
+            if lid.startswith("COG-") or lid.startswith("SEP-"):
                 try:
                     num = int(lid.split("-")[1])
                     if num > max_num:
@@ -427,25 +445,19 @@ def append_lead_row(sheet_url: str, range_name: str, lead_data: dict) -> dict:
         pass
 
     if not clean_data.get("Lead ID"):
-        clean_data["Lead ID"] = f"COG-{max_num + 1}"
+        prefix = "SEP" if range_name and "sept" in range_name.lower() else "COG"
+        clean_data["Lead ID"] = f"{prefix}-{max_num + 1}"
 
     try:
         service = _get_service()
         sheet_id = _extract_sheet_id(sheet_url)
         gid = _extract_gid(sheet_url)
         
-        # 1. Fetch spreadsheet metadata to map gid to title
+        # 1. Fetch spreadsheet metadata to resolve target sheet title
         metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheets = metadata.get("sheets", [])
-        target_title = None
-        if gid:
-            for s in sheets:
-                props = s.get("properties", {})
-                if str(props.get("sheetId")) == str(gid):
-                    target_title = props.get("title")
-                    break
-        if not target_title and sheets:
-            target_title = sheets[0].get("properties", {}).get("title")
+        target_sheet = _resolve_target_sheet(sheets, range_name, gid)
+        target_title = target_sheet.get("properties", {}).get("title") if target_sheet else None
         final_range = target_title if target_title else range_name
         
         # 2. Fetch headers to order cell values correctly
@@ -518,15 +530,8 @@ def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: di
         
         metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheets = metadata.get("sheets", [])
-        target_title = None
-        if gid:
-            for s in sheets:
-                props = s.get("properties", {})
-                if str(props.get("sheetId")) == str(gid):
-                    target_title = props.get("title")
-                    break
-        if not target_title and sheets:
-            target_title = sheets[0].get("properties", {}).get("title")
+        target_sheet = _resolve_target_sheet(sheets, range_name, gid)
+        target_title = target_sheet.get("properties", {}).get("title") if target_sheet else None
         final_range = target_title if target_title else range_name
         
         result = service.spreadsheets().values().get(spreadsheetId=sheet_id, range=f"'{final_range}'!A1:ZZ1").execute()
@@ -535,6 +540,18 @@ def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: di
             raise ValueError("Target sheet headers could not be found.")
         headers = [h.strip() for h in values[0]]
         deduped_headers = _deduplicate_headers(headers)
+
+        # Fetch existing row values so hidden columns are preserved
+        existing_row = []
+        try:
+            existing_res = service.spreadsheets().values().get(
+                spreadsheetId=sheet_id,
+                range=f"'{final_range}'!A{row_num}:ZZ{row_num}"
+            ).execute()
+            if existing_res.get("values"):
+                existing_row = existing_res["values"][0]
+        except Exception:
+            pass
         
         # Auto-add any new non-empty columns (e.g. Tender Detail fields) to sheet headers
         new_cols = [k for k, v in clean_data.items() if k not in deduped_headers and v != ""]
@@ -552,8 +569,13 @@ def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: di
                 print(f"Failed to append new headers on update: {header_err}")
 
         row_values = []
-        for dh in deduped_headers:
-            row_values.append(str(clean_data.get(dh, "")).strip())
+        for idx, dh in enumerate(deduped_headers):
+            if dh in clean_data:
+                row_values.append(str(clean_data.get(dh, "")).strip())
+            elif idx < len(existing_row):
+                row_values.append(str(existing_row[idx]).strip())
+            else:
+                row_values.append("")
             
         range_to_update = f"'{final_range}'!A{row_num}"
         body = {
@@ -592,15 +614,8 @@ def delete_lead_row(sheet_url: str, range_name: str, row_num: int) -> dict:
         # Resolve sheet metadata to get correct sheetId of target tab
         metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheets = metadata.get("sheets", [])
-        target_sheet_id = None
-        if gid:
-            for s in sheets:
-                props = s.get("properties", {})
-                if str(props.get("sheetId")) == str(gid):
-                    target_sheet_id = props.get("sheetId")
-                    break
-        if target_sheet_id is None and sheets:
-            target_sheet_id = sheets[0].get("properties", {}).get("sheetId")
+        target_sheet = _resolve_target_sheet(sheets, range_name, gid)
+        target_sheet_id = target_sheet.get("properties", {}).get("sheetId") if target_sheet else None
             
         if target_sheet_id is None:
             raise ValueError("Could not resolve target Google Sheet tab ID.")

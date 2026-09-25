@@ -186,6 +186,38 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
     warmRevenue = totalEstimatedRevenue - hotRevenue - coldRevenue - discoveryRevenue;
   }
 
+  // Count leads by status/temperature
+  let hotCount = 0;
+  let warmCount = 0;
+  let coldCount = 0;
+  let discoveryCount = 0;
+  const totalRowsCount = sheetData.rows ? sheetData.rows.length : 0;
+
+  if (sheetData.rows) {
+    sheetData.rows.forEach(row => {
+      let statusVal = "";
+      for (const key of Object.keys(row)) {
+        if (key.toLowerCase().includes("status")) {
+          const val = String(row[key] || "").toLowerCase().trim();
+          if (["hot", "warm", "cold", "discovery", "dead"].includes(val)) {
+            statusVal = val;
+            break;
+          }
+        }
+      }
+      if (!statusVal) {
+        statusVal = String(row[statusHeader] || "").toLowerCase().trim();
+      }
+
+      if (statusVal === "hot") hotCount++;
+      else if (statusVal === "warm") warmCount++;
+      else if (statusVal === "cold" || statusVal === "dead") coldCount++;
+      else if (statusVal === "discovery") discoveryCount++;
+    });
+  }
+
+  const hasRevenueData = totalEstimatedRevenue > 0;
+
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -198,41 +230,41 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
     <div className="rounded-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] p-5 shadow-xl transition-colors duration-150 flex flex-col md:flex-row gap-6 w-full h-full">
       {/* Left side: Metrics Cards */}
       <div className="flex flex-col gap-3.5 w-full md:w-72 shrink-0 justify-between">
-        {/* Total Estimated Revenue Card */}
+        {/* Metric 1 */}
         <div className="flex-1 p-5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between shadow-sm min-h-[110px]">
           <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899] font-sans">
-            Total Estimated Revenue
+            {hasRevenueData ? "Total Estimated Revenue" : "Active Pipeline Leads"}
           </span>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-xl font-bold text-blue-600 dark:text-[#38BDF8] font-sans flex items-center gap-1">
-              {formatCurrency(totalEstimatedRevenue)}
+              {hasRevenueData ? formatCurrency(totalEstimatedRevenue) : `${totalRowsCount} Leads`}
             </span>
             <span className="text-[10px] font-bold text-blue-500 flex items-center font-mono">
-              ↑ 0%
+              Live
             </span>
           </div>
         </div>
 
-        {/* Won Revenue Card */}
+        {/* Metric 2 */}
         <div className="flex-1 p-5 rounded-xl border border-gray-150 dark:border-white/5 bg-gray-50/30 dark:bg-[#161622]/40 flex flex-col justify-between shadow-sm min-h-[110px]">
           <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899] font-sans">
-            Won Revenue
+            {hasRevenueData ? "Won Revenue" : "High Intent (Hot + Warm)"}
           </span>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-xl font-bold font-sans flex items-center gap-1" style={{ color: "#1D9E75" }}>
-              +{formatCurrency(wonRevenue)}
+              {hasRevenueData ? `+${formatCurrency(wonRevenue)}` : `${hotCount + warmCount} Leads`}
             </span>
             <span className="text-[10px] font-bold flex items-center font-mono" style={{ color: "#1D9E75" }}>
-              ↑ 0%
+              {totalRowsCount > 0 ? `${Math.round(((hotCount + warmCount) / totalRowsCount) * 100)}%` : "0%"}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Right side: Numerical breakdown of Hot, Warm, Cold */}
+      {/* Right side: Breakdown by Lead Temperature */}
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <h4 className="text-[11px] font-semibold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-sans mb-3.5">
-          Revenue Breakdown by Lead Temp
+          {hasRevenueData ? "Revenue Breakdown by Lead Temp" : "Pipeline Breakdown by Lead Temperature"}
         </h4>
         <div className="flex flex-col gap-3">
           {/* Hot leads row */}
@@ -243,18 +275,18 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Hot Leads</span>
               </div>
               <span className="text-xs font-bold text-[#FF1744]">
-                {formatCurrency(hotRevenue)}
+                {hasRevenueData ? formatCurrency(hotRevenue) : `${hotCount} Leads`}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
                 className="bg-[#FF1744] h-full rounded-full transition-all duration-500" 
-                style={{ width: `${totalEstimatedRevenue > 0 ? (hotRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+                style={{ width: `${hasRevenueData ? (totalEstimatedRevenue > 0 ? (hotRevenue / totalEstimatedRevenue) * 100 : 0) : (totalRowsCount > 0 ? (hotCount / totalRowsCount) * 100 : 0)}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
               <span>Share of pipeline</span>
-              <span>{totalEstimatedRevenue > 0 ? ((hotRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+              <span>{hasRevenueData ? (totalEstimatedRevenue > 0 ? ((hotRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0) : (totalRowsCount > 0 ? ((hotCount / totalRowsCount) * 100).toFixed(1) : 0)}%</span>
             </div>
           </div>
 
@@ -266,18 +298,18 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Warm Leads</span>
               </div>
               <span className="text-xs font-bold text-[#FFD600]">
-                {formatCurrency(warmRevenue)}
+                {hasRevenueData ? formatCurrency(warmRevenue) : `${warmCount} Leads`}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
                 className="bg-[#FFD600] h-full rounded-full transition-all duration-500" 
-                style={{ width: `${totalEstimatedRevenue > 0 ? (warmRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+                style={{ width: `${hasRevenueData ? (totalEstimatedRevenue > 0 ? (warmRevenue / totalEstimatedRevenue) * 100 : 0) : (totalRowsCount > 0 ? (warmCount / totalRowsCount) * 100 : 0)}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
               <span>Share of pipeline</span>
-              <span>{totalEstimatedRevenue > 0 ? ((warmRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+              <span>{hasRevenueData ? (totalEstimatedRevenue > 0 ? ((warmRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0) : (totalRowsCount > 0 ? ((warmCount / totalRowsCount) * 100).toFixed(1) : 0)}%</span>
             </div>
           </div>
 
@@ -289,18 +321,18 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Cold Leads</span>
               </div>
               <span className="text-xs font-bold text-[#00E5FF]">
-                {formatCurrency(coldRevenue)}
+                {hasRevenueData ? formatCurrency(coldRevenue) : `${coldCount} Leads`}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
                 className="bg-[#00E5FF] h-full rounded-full transition-all duration-500" 
-                style={{ width: `${totalEstimatedRevenue > 0 ? (coldRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+                style={{ width: `${hasRevenueData ? (totalEstimatedRevenue > 0 ? (coldRevenue / totalEstimatedRevenue) * 100 : 0) : (totalRowsCount > 0 ? (coldCount / totalRowsCount) * 100 : 0)}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
               <span>Share of pipeline</span>
-              <span>{totalEstimatedRevenue > 0 ? ((coldRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+              <span>{hasRevenueData ? (totalEstimatedRevenue > 0 ? ((coldRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0) : (totalRowsCount > 0 ? ((coldCount / totalRowsCount) * 100).toFixed(1) : 0)}%</span>
             </div>
           </div>
 
@@ -312,18 +344,18 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Discovery Leads</span>
               </div>
               <span className="text-xs font-bold text-[#AA00FF]">
-                {formatCurrency(discoveryRevenue)}
+                {hasRevenueData ? formatCurrency(discoveryRevenue) : `${discoveryCount} Leads`}
               </span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-white/5 h-2 rounded-full overflow-hidden">
               <div 
                 className="bg-[#AA00FF] h-full rounded-full transition-all duration-500" 
-                style={{ width: `${totalEstimatedRevenue > 0 ? (discoveryRevenue / totalEstimatedRevenue) * 100 : 0}%` }}
+                style={{ width: `${hasRevenueData ? (totalEstimatedRevenue > 0 ? (discoveryRevenue / totalEstimatedRevenue) * 100 : 0) : (totalRowsCount > 0 ? (discoveryCount / totalRowsCount) * 100 : 0)}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-gray-500 dark:text-[#888899] font-mono">
               <span>Share of pipeline</span>
-              <span>{totalEstimatedRevenue > 0 ? ((discoveryRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0}%</span>
+              <span>{hasRevenueData ? (totalEstimatedRevenue > 0 ? ((discoveryRevenue / totalEstimatedRevenue) * 100).toFixed(1) : 0) : (totalRowsCount > 0 ? ((discoveryCount / totalRowsCount) * 100).toFixed(1) : 0)}%</span>
             </div>
           </div>
         </div>

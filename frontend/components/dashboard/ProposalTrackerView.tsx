@@ -57,15 +57,6 @@ const STAGE_COLUMNS = [
     headerBg: "border-t-2 border-t-amber-500",
   },
   {
-    id: "negotiation",
-    title: "In Negotiation",
-    description: "Terms, pricing, and scope adjustments",
-    matches: ["negotiation", "under negotiation", "discussing"],
-    color: "purple",
-    badgeBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-    headerBg: "border-t-2 border-t-purple-500",
-  },
-  {
     id: "won",
     title: "Closed Won",
     description: "Proposal accepted, deal finalized",
@@ -202,7 +193,6 @@ export default function ProposalTrackerView({
     if (stageVal.includes("to be sent") || stageVal.includes("prep")) return "prep";
     if (["won", "closed won", "converted", "completed", "success"].some(x => stageVal.includes(x))) return "won";
     if (["lost", "closed lost", "dead", "cancelled"].some(x => stageVal.includes(x))) return "lost";
-    if (stageVal.includes("negotiation")) return "negotiation";
     return "sent"; // Default for "proposal sent" or generic proposal
   };
 
@@ -215,7 +205,6 @@ export default function ProposalTrackerView({
     let wonCount = 0;
     let lostCount = 0;
     let inReviewCount = 0;
-    let negotiationCount = 0;
     let prepCount = 0;
 
     allProposals.forEach(row => {
@@ -231,9 +220,6 @@ export default function ProposalTrackerView({
         wonValue += numVal;
       } else if (colId === "lost") {
         lostCount++;
-      } else if (colId === "negotiation") {
-        negotiationCount++;
-        activeValue += numVal;
       } else if (colId === "prep") {
         prepCount++;
         activeValue += numVal;
@@ -243,7 +229,7 @@ export default function ProposalTrackerView({
       }
     });
 
-    const activeCount = inReviewCount + negotiationCount + prepCount;
+    const activeCount = inReviewCount + prepCount;
     const completedCount = wonCount + lostCount;
     const winRate = completedCount > 0 
       ? Math.round((wonCount / completedCount) * 100) 
@@ -259,7 +245,6 @@ export default function ProposalTrackerView({
       wonValue,
       lostCount,
       inReviewCount,
-      negotiationCount,
       prepCount,
       winRate,
       avgProposalValue,
@@ -357,26 +342,16 @@ export default function ProposalTrackerView({
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-blue-500" : ""}`} />
             </button>
           )}
-
-          {onAddLead && (
-            <button
-              onClick={onAddLead}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              + Track Proposal
-            </button>
-          )}
         </div>
       </div>
 
       {/* Row 1: Key Proposal Performance Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* KPI 1: Total Proposals Sent */}
         <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
-              Total Proposals Sent
+              Total Proposals Tracked
             </span>
             <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
               <Send className="w-3.5 h-3.5" />
@@ -387,12 +362,12 @@ export default function ProposalTrackerView({
               {metrics.totalSentCount}
             </div>
             <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
-              {formatCurrency(metrics.totalPipelineValue)}
+              {metrics.totalPipelineValue > 0 ? formatCurrency(metrics.totalPipelineValue) : "Active proposals"}
             </div>
           </div>
         </div>
 
-        {/* KPI 2: Under Review / Pending */}
+        {/* KPI 2: Under Review / Sent */}
         <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
@@ -412,22 +387,22 @@ export default function ProposalTrackerView({
           </div>
         </div>
 
-        {/* KPI 3: In Negotiation */}
+        {/* KPI 3: Proposal to be Sent */}
         <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
-              In Negotiation
+              Proposal to be Sent
             </span>
-            <div className="w-6 h-6 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-              <TrendingUp className="w-3.5 h-3.5" />
+            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <AlertTriangle className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 font-sans">
-              {metrics.negotiationCount}
+            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-sans">
+              {metrics.prepCount}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Finalizing terms
+              In preparation
             </div>
           </div>
         </div>
@@ -452,27 +427,7 @@ export default function ProposalTrackerView({
               </span>
             </div>
             <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
-              {formatCurrency(metrics.wonValue)} won
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 5: Avg Proposal Size */}
-        <div className="p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111118] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899]">
-              Avg Proposal Size
-            </span>
-            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <AlertTriangle className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white font-sans">
-              {formatCurrency(metrics.avgProposalValue)}
-            </div>
-            <div className="text-xs text-rose-500 mt-0.5">
-              {metrics.lostCount} proposals lost
+              {metrics.wonValue > 0 ? `${formatCurrency(metrics.wonValue)} won` : `${metrics.lostCount} closed lost`}
             </div>
           </div>
         </div>
@@ -544,7 +499,7 @@ export default function ProposalTrackerView({
       {/* Row 3: Main View: Either Pipeline Stage Board OR Detailed Table */}
       {viewMode === "pipeline" ? (
         /* ================= STAGE MOVEMENT KANBAN BOARD ================= */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
           {STAGE_COLUMNS.map((col) => {
             const columnProposals = filteredProposals.filter(r => getProposalColumnId(r) === col.id);
             const columnTotalValue = columnProposals.reduce((sum, r) => {
@@ -673,7 +628,6 @@ export default function ProposalTrackerView({
                                   title="Change proposal stage"
                                 >
                                   <option value="Proposal sent">Move: Sent</option>
-                                  <option value="Negotiation">Move: Negotiation</option>
                                   <option value="Won">Move: Won</option>
                                   <option value="Lost">Move: Lost</option>
                                   <option value="Proposal to be Sent">Move: Prep</option>
@@ -703,7 +657,6 @@ export default function ProposalTrackerView({
                 <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#161622]/40 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#888899]">
                   <th className="py-3 px-4">Lead ID</th>
                   <th className="py-3 px-4">Company</th>
-                  <th className="py-3 px-4 text-right">Proposal Value</th>
                   <th className="py-3 px-4">Current Stage</th>
                   <th className="py-3 px-4">Client Status</th>
                   <th className="py-3 px-4">Proposal Date</th>
@@ -718,7 +671,6 @@ export default function ProposalTrackerView({
                     const rowNum = lead["_row_num"] || lead["Lead ID"];
                     const company = String(lead[companyCol] || "Unnamed Lead");
                     const leadId = String(lead["Lead ID"] || `COG-${1000 + Number(rowNum)}`);
-                    const val = String(lead[valueCol] || "—");
                     const stage = String(lead[stageCol] || "");
                     const status = String(lead[statusCol] || "");
                     const dateVal = lead[dateCol] || lead[deadlineCol] || "—";
@@ -742,16 +694,13 @@ export default function ProposalTrackerView({
                             {company}
                           </button>
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {val}
-                        </td>
                         <td className="py-3 px-4">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                               colId === "won"
                                 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-                                : colId === "negotiation"
-                                ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40"
+                                : colId === "prep"
+                                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40"
                                 : colId === "lost"
                                 ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40"
                                 : "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40"
@@ -803,7 +752,6 @@ export default function ProposalTrackerView({
                                 className="text-[10px] font-sans font-medium bg-gray-50 dark:bg-[#1E1E2D] border border-gray-200 dark:border-white/10 rounded px-2 py-1 text-gray-700 dark:text-gray-200 cursor-pointer outline-none"
                               >
                                 <option value="Proposal sent">Proposal Sent</option>
-                                <option value="Negotiation">Negotiation</option>
                                 <option value="Won">Won</option>
                                 <option value="Lost">Lost</option>
                                 <option value="Proposal to be Sent">To be Sent</option>
@@ -836,7 +784,7 @@ export default function ProposalTrackerView({
                   })
                 ) : (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-gray-400 dark:text-[#555566] text-xs">
+                    <td colSpan={8} className="py-12 text-center text-gray-400 dark:text-[#555566] text-xs">
                       No proposals match the current filter criteria.
                     </td>
                   </tr>
@@ -857,17 +805,8 @@ export default function ProposalTrackerView({
             No Proposals In Pipeline Yet
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-            When any lead’s stage is set to <strong>"Proposal sent"</strong> or <strong>"Negotiation"</strong>, it will automatically appear here in this dedicated proposal movement tracker.
+            When any lead’s stage is set to <strong>"Proposal sent"</strong> or <strong>"Proposal to be Sent"</strong>, it will automatically appear here in this dedicated proposal movement tracker.
           </p>
-          {onAddLead && (
-            <button
-              onClick={onAddLead}
-              className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Your First Proposal
-            </button>
-          )}
         </div>
       )}
     </div>

@@ -42,12 +42,12 @@ export const api = {
   }>("/api/sheets/auth-status"),
   signOut: () => apiFetch<{ ok: boolean }>("/api/sheets/signout", { method: "POST" }),
   disconnectSheets: () => apiFetch<{ ok: boolean }>("/api/sheets/disconnect-sheets", { method: "POST" }),
-  addLead: (leadData: Record<string, any>) =>
-    apiFetch<{ ok: boolean }>("/api/sheets/lead", { method: "POST", body: JSON.stringify(leadData) }),
-  updateLead: (rowNum: number, leadData: Record<string, any>) =>
-    apiFetch<{ ok: boolean }>(`/api/sheets/lead/${rowNum}`, { method: "PUT", body: JSON.stringify(leadData) }),
-  deleteLead: (rowNum: number) =>
-    apiFetch<{ ok: boolean }>(`/api/sheets/lead/${rowNum}`, { method: "DELETE" }),
+  addLead: (leadData: Record<string, any>, sheetRange?: string) =>
+    apiFetch<{ ok: boolean }>(`/api/sheets/lead${sheetRange ? `?sheet_range=${encodeURIComponent(sheetRange)}` : ""}`, { method: "POST", body: JSON.stringify(leadData) }),
+  updateLead: (rowNum: number, leadData: Record<string, any>, sheetRange?: string) =>
+    apiFetch<{ ok: boolean }>(`/api/sheets/lead/${rowNum}${sheetRange ? `?sheet_range=${encodeURIComponent(sheetRange)}` : ""}`, { method: "PUT", body: JSON.stringify(leadData) }),
+  deleteLead: (rowNum: number, sheetRange?: string) =>
+    apiFetch<{ ok: boolean }>(`/api/sheets/lead/${rowNum}${sheetRange ? `?sheet_range=${encodeURIComponent(sheetRange)}` : ""}`, { method: "DELETE" }),
   importLeads: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);

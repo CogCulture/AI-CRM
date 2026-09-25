@@ -299,10 +299,8 @@ export default function CRMTable({
   // Inject "Lead ID" at the very beginning of the active columns list (filtering out any duplicates)
   let activeCols = ["Lead ID", ...activeColsRaw.filter((col) => col !== "Lead ID")];
   
-  // Globally remove Status column from table display
   activeCols = activeCols.filter(col => {
     const colLower = col.toLowerCase().trim();
-    if (colLower === "status") return false;
     
     // For Tender Dashboard, remove specific columns
     if (isTenderDashboard) {
@@ -317,25 +315,13 @@ export default function CRMTable({
       }
     }
 
-    // For Active Leads and Internal Leads, show core columns including financial estimations
-    if (currentTab === "active_leads" || currentTab === "internal_leads") {
-      const isAllowed = 
-        colLower === "lead id" || 
-        colLower === "date" || 
-        colLower.includes("company") || 
-        colLower === "requirement" || 
-        colLower === "stage" || 
+    // For Active Leads, strictly never display hidden revenue/estimation/retainer columns
+    if (currentTab === "active_leads") {
+      if (
         colLower.includes("revenue") ||
         colLower.includes("estimation") ||
-        colLower.includes("retainer") ||
-        colLower.includes("value") ||
-        colLower.includes("amount") ||
-        colLower === "source" ||
-        colLower === "cog poc" || 
-        colLower === "poc" ||
-        colLower === "actions"; // keep actions column if any
-      
-      if (!isAllowed) {
+        colLower.includes("retainer")
+      ) {
         return false;
       }
     }

@@ -4,6 +4,8 @@ export interface SheetData {
   total: number;
   hidden_count?: number;
   unhidden_count?: number;
+  hidden_columns?: string[];
+  sheet_tab?: string;
   configured: boolean;
   is_mock?: boolean;
 }
