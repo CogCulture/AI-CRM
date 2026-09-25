@@ -36,12 +36,15 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isRedirecting = false;
     async function checkAuth() {
       try {
         const status = await api.getAuthStatus();
         if (!status.authenticated) {
+          isRedirecting = true;
           router.replace("/login");
         } else if (status.email && !isWorkEmail(status.email)) {
+          isRedirecting = true;
           await api.signOut();
           router.replace("/login?error=work_email_required");
         } else {
@@ -52,9 +55,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           });
         }
       } catch (err) {
+        isRedirecting = true;
         router.replace("/login");
       } finally {
-        setLoading(false);
+        // Only stop loading if we are NOT redirecting away
+        if (!isRedirecting) {
+          setLoading(false);
+        }
       }
     }
     checkAuth();
