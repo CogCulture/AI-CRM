@@ -21,7 +21,9 @@ import {
   Calendar,
   Layers,
   Table as TableIcon,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 interface ProposalTrackerViewProps {
@@ -136,6 +138,7 @@ export default function ProposalTrackerView({
   const [selectedPOC, setSelectedPOC] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [updatingId, setUpdatingId] = useState<string | number | null>(null);
+  const [includeArchivedProposals, setIncludeArchivedProposals] = useState(false);
 
   // Column name detection
   const headers = sheetData?.headers || [];
@@ -152,16 +155,18 @@ export default function ProposalTrackerView({
     if (!sheetData?.rows) return [];
     
     return sheetData.rows.filter(row => {
+      if (!includeArchivedProposals && row._is_hidden) return false;
       const stageVal = String(row[stageCol] || "").toLowerCase().trim();
       // Include any row where stage involves proposal or subsequent pipeline steps
       return (
         stageVal.includes("proposal") || 
         stageVal.includes("negotiation") || 
+        stageVal.includes("portfolio") ||
         ["won", "closed won", "converted"].some(x => stageVal.includes(x)) ||
         ["lost", "closed lost", "dead"].some(x => stageVal.includes(x))
       );
     });
-  }, [sheetData, stageCol]);
+  }, [sheetData, stageCol, includeArchivedProposals]);
 
   // Unique POCs for filter dropdown
   const uniquePOCs = useMemo(() => {
@@ -323,6 +328,24 @@ export default function ProposalTrackerView({
               List Table
             </button>
           </div>
+
+          {sheetData?.rows?.some(r => r._is_hidden) && (
+            <button
+              onClick={() => setIncludeArchivedProposals(!includeArchivedProposals)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                includeArchivedProposals
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  : "bg-white dark:bg-[#161622] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300"
+              }`}
+              title={includeArchivedProposals ? "Switch to active unhidden proposals only" : "Include archived proposals from Google Sheet"}
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-500" />
+              <span>{includeArchivedProposals ? "All Proposals" : "Active Proposals"}</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-white/10">
+                {allProposals.length}
+              </span>
+            </button>
+          )}
 
           {onRefresh && (
             <button

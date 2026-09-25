@@ -17,7 +17,7 @@ import TenderDashboardView from "../../components/dashboard/TenderDashboardView"
 import { api } from "../../lib/api";
 import { SheetData, DashboardSummary, GraphConfig } from "../../lib/types";
 import { toast } from "sonner";
-import { RefreshCw, Search, Bell, X, AlertCircle } from "lucide-react";
+import { RefreshCw, Search, Bell, X, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 // Helper function to check if a date string is today's date
 const isToday = (dateVal: any): boolean => {
@@ -106,6 +106,7 @@ function DashboardContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAlertPanel, setShowAlertPanel] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState("All");
+  const [includeArchived, setIncludeArchived] = useState(false);
 
   // Lead modal states
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
@@ -361,12 +362,18 @@ function DashboardContent() {
     };
 
     let rows = sheetData.rows;
+
+    // By default, strictly filter out hidden / collapsed rows from Google Sheets (archive)
+    if (!includeArchived) {
+      rows = rows.filter(row => !row._is_hidden);
+    }
+
     if (isTendersTab) {
       // Tender Section: strictly rows where Source is 'Tender'
       rows = rows.filter(row => isRowTender(row));
     } else if (isInternalLeadsTab) {
       // Internal Leads Section: fetched directly from Internal Leads primary sheet tab
-      rows = sheetData.rows;
+      rows = rows;
     } else {
       // Active Leads Section: strictly exclude any row where Source is 'Tender' so they appear in Tender ONLY
       rows = rows.filter(row => !isRowTender(row));
@@ -395,7 +402,7 @@ function DashboardContent() {
       }
       return false;
     });
-  }, [sheetData, selectedMonth, dateCol, isTendersTab, isInternalLeadsTab]);
+  }, [sheetData, selectedMonth, dateCol, isTendersTab, isInternalLeadsTab, includeArchived]);
 
   const filteredSheetData = React.useMemo<SheetData | null>(() => {
     if (!sheetData) return null;
@@ -414,6 +421,7 @@ function DashboardContent() {
     }) || "Source";
 
     const nonTenders = sheetData.rows.filter(row => {
+      if (!includeArchived && row._is_hidden) return false;
       const val = String(row[sourceColName] || "").trim().toLowerCase();
       if (val === "tender") return false;
       for (const [k, v] of Object.entries(row)) {
@@ -430,7 +438,7 @@ function DashboardContent() {
       rows: nonTenders,
       total: nonTenders.length
     };
-  }, [sheetData]);
+  }, [sheetData, includeArchived]);
 
   // Calculate display KPIs dynamically based on filtered rows
   const displayKpis = React.useMemo(() => {
@@ -781,9 +789,37 @@ function DashboardContent() {
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
               {!sheetData?.is_mock && (
                 <>
+                  {/* Unhidden vs All Leads Toggle */}
+                  {sheetData && (sheetData.hidden_count || 0) > 0 && (
+                    <button
+                      onClick={() => setIncludeArchived(!includeArchived)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer border ${
+                        includeArchived
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 shadow-xs"
+                          : "bg-white dark:bg-[#111118] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300"
+                      }`}
+                      title={includeArchived ? "Switch back to viewing only unhidden active leads" : `Include ${sheetData.hidden_count} hidden/archived rows from Google Sheets`}
+                    >
+                      {includeArchived ? (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-amber-500" />
+                          <span>All Leads ({filteredRows.length})</span>
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Active Leads Only ({filteredRows.length})</span>
+                          <span className="text-[10px] text-gray-400 font-normal">
+                            ({sheetData.hidden_count} hidden)
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     onClick={handleAddLead}
                     className="px-3 py-1.5 bg-white dark:bg-[#111118] hover:bg-gray-55 dark:hover:bg-[#1C1C2D] text-gray-700 dark:text-white border border-gray-200 dark:border-[rgba(255,255,255,0.06)] rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer"

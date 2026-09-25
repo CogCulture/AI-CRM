@@ -2,6 +2,8 @@ export interface SheetData {
   headers: string[];
   rows: Record<string, any>[];
   total: number;
+  hidden_count?: number;
+  unhidden_count?: number;
   configured: boolean;
   is_mock?: boolean;
 }

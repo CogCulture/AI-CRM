@@ -152,6 +152,7 @@ export default function TenderDashboardView({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStageFilter, setSelectedStageFilter] = useState<string>("All");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("All");
+  const [includeArchivedTenders, setIncludeArchivedTenders] = useState(false);
   
   // Modals
   const [detailTender, setDetailTender] = useState<Record<string, any> | null>(null);
@@ -207,7 +208,7 @@ export default function TenderDashboardView({
     return d;
   }, []);
 
-  // Filter tenders from rows (strictly where Source is 'Tender' only)
+  // Filter tenders from rows (strictly where Source is 'Tender' and unhidden by default)
   const tenderRows = useMemo(() => {
     if (!sheetData?.rows) return [];
     const sourceCol = headers.find(h => {
@@ -216,6 +217,7 @@ export default function TenderDashboardView({
     }) || "Source";
     
     return sheetData.rows.filter(row => {
+      if (!includeArchivedTenders && row._is_hidden) return false;
       const val = String(row[sourceCol] || "").trim().toLowerCase();
       if (val === "tender") return true;
       for (const [k, v] of Object.entries(row)) {
@@ -226,7 +228,7 @@ export default function TenderDashboardView({
       }
       return false;
     });
-  }, [sheetData, headers]);
+  }, [sheetData, headers, includeArchivedTenders]);
 
   // Process tenders with normalized fields, parsed submission dates, and days remaining countdown
   const processedTenders = useMemo<ProcessedTender[]>(() => {
@@ -428,6 +430,24 @@ export default function TenderDashboardView({
 
         {/* Global Toolbar Controls */}
         <div className="flex items-center gap-2.5 flex-wrap">
+          {sheetData?.rows?.some(r => r._is_hidden) && (
+            <button
+              onClick={() => setIncludeArchivedTenders(!includeArchivedTenders)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                includeArchivedTenders
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  : "bg-white dark:bg-[#161622] hover:bg-gray-50 dark:hover:bg-[#1C1C2D] border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300"
+              }`}
+              title={includeArchivedTenders ? "Switch back to active unhidden bids only" : "Include archived/hidden tenders from Google Sheet"}
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-500" />
+              <span>{includeArchivedTenders ? "All Tenders" : "Active Bids Only"}</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-white/10">
+                {tenderRows.length}
+              </span>
+            </button>
+          )}
+
           {onRefresh && (
             <button
               onClick={onRefresh}

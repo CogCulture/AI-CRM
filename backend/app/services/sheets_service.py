@@ -215,7 +215,21 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
             print(f"Failed to fetch sheet metadata (falling back to range '{range_name}'): {meta_err}")
             final_range = range_name
 
-        # 2. Fetch values with fallback if specified range does not exist
+        # 2. Fetch row visibility metadata (hiddenByUser, hiddenByFilter)
+        row_metadata_list = []
+        try:
+            meta_res = service.spreadsheets().get(
+                spreadsheetId=sheet_id,
+                ranges=[final_range],
+                fields="sheets.data.rowMetadata(hiddenByFilter,hiddenByUser)"
+            ).execute()
+            sheets_data = meta_res.get("sheets", [])
+            if sheets_data and sheets_data[0].get("data") and sheets_data[0]["data"][0].get("rowMetadata"):
+                row_metadata_list = sheets_data[0]["data"][0]["rowMetadata"]
+        except Exception as meta_err:
+            print(f"Failed to fetch row visibility metadata: {meta_err}")
+
+        # 3. Fetch values with fallback if specified range does not exist
         try:
             result = (
                 service.spreadsheets()
@@ -267,12 +281,24 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                         continue
                     row_dict["_row_num"] = grid_row_idx + 1
                     
+                    # Detect if row is hidden or collapsed in Google Sheet
+                    meta_info = row_metadata_list[grid_row_idx] if grid_row_idx < len(row_metadata_list) else {}
+                    is_hidden = bool(meta_info.get("hiddenByUser", False) or meta_info.get("hiddenByFilter", False))
+                    row_dict["_is_hidden"] = is_hidden
+
                     # Backfill/inject Lead ID
                     if not row_dict.get("Lead ID"):
                         row_dict["Lead ID"] = f"COG-{1000 + row_dict['_row_num']}"
                     
                     normalized.append(row_dict)
-            data = _apply_local_overrides({"headers": headers, "rows": normalized, "total": len(normalized), "is_mock": False})
+            data = _apply_local_overrides({
+                "headers": headers, 
+                "rows": normalized, 
+                "total": len(normalized), 
+                "hidden_count": sum(1 for r in normalized if r.get("_is_hidden")),
+                "unhidden_count": sum(1 for r in normalized if not r.get("_is_hidden")),
+                "is_mock": False
+            })
             
         _cache[cache_key] = data
         return data
@@ -361,10 +387,14 @@ def _apply_local_overrides(data: dict) -> dict:
                 row_copy[h] = ""
         final_rows.append(row_copy)
 
+    hidden_count = sum(1 for r in final_rows if r.get("_is_hidden"))
+    unhidden_count = sum(1 for r in final_rows if not r.get("_is_hidden"))
     return {
         "headers": headers,
         "rows": final_rows,
         "total": len(final_rows),
+        "hidden_count": hidden_count,
+        "unhidden_count": unhidden_count,
         "is_mock": data.get("is_mock", False)
     }
 
