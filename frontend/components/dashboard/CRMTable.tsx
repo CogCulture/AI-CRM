@@ -268,6 +268,7 @@ export default function CRMTable({
     ? Array.from(new Set(rows.map(r => String(r[statusColumn] || "").trim()).filter(Boolean)))
     : [];
   const [selectedStatus, setSelectedStatus] = useState("All");
+  const [selectedSource, setSelectedSource] = useState("All");
 
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -278,7 +279,7 @@ export default function CRMTable({
   // Reset pagination index on search / sort / filter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeSearch, sortColumn, sortDirection, selectedType, selectedStatus]);
+  }, [activeSearch, sortColumn, sortDirection, selectedType, selectedStatus, selectedSource]);
 
   // Determine active columns and order
   const displayCols = columnOrder.length > 0 ? columnOrder : [...headers];
@@ -352,11 +353,20 @@ export default function CRMTable({
     }
 
     let matchesStatus = true;
-    if (statusColumn && selectedStatus !== "All") {
-      matchesStatus = String(row[statusColumn] || "").trim() === selectedStatus;
+    if (selectedStatus !== "All") {
+      const rowSt = getRowStatus(row).toLowerCase().trim();
+      const targetSt = selectedStatus.toLowerCase().trim();
+      matchesStatus = rowSt === targetSt || rowSt.includes(targetSt);
     }
 
-    return matchesSearch && matchesType && matchesStatus;
+    let matchesSource = true;
+    if (selectedSource !== "All") {
+      const rowSrc = getRowSource(row).toLowerCase().trim();
+      const targetSrc = selectedSource.toLowerCase().trim();
+      matchesSource = rowSrc === targetSrc || rowSrc.includes(targetSrc);
+    }
+
+    return matchesSearch && matchesType && matchesStatus && matchesSource;
   });
 
   // Sort filtered rows
@@ -385,60 +395,134 @@ export default function CRMTable({
   const currentRows = sortedRows.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(sortedRows.length / rowsPerPage);
 
-  const sourceColumn = headers.find(h => {
-    const hl = h.toLowerCase().trim();
-    return hl === "source" || hl === "sources" || hl.includes("source") || hl.includes("lead source");
+  // Deduplicate and extract unique sources across all rows case-insensitively
+  const sourceMap = new Map<string, string>();
+  rows.forEach(r => {
+    const s = getRowSource(r).trim();
+    if (!s) return;
+    const lower = s.toLowerCase();
+    if (!sourceMap.has(lower)) {
+      let display = s;
+      if (lower === "linkedin") display = "LinkedIn";
+      else if (lower === "website") display = "Website";
+      else if (lower === "inbound") display = "Inbound";
+      else if (lower === "internal") display = "Internal";
+      else if (lower === "direct") display = "Direct";
+      else if (lower === "dm") display = "DM";
+      else if (lower === "tender") display = "Tender";
+      else display = s.charAt(0).toUpperCase() + s.slice(1);
+      sourceMap.set(lower, display);
+    }
   });
-  const activeSources = sourceColumn
-    ? Array.from(new Set(rows.map(r => String(r[sourceColumn] || "").trim()).filter(Boolean)))
-    : ["Internal", "Tender", "Website", "Linkedin", "Inbound"];
+  const activeSources = sourceMap.size > 0 
+    ? Array.from(sourceMap.values())
+    : ["Website", "LinkedIn", "Internal", "Inbound", "Direct", "DM", "Tender"];
 
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-[rgba(255,255,255,0.06)] bg-white dark:bg-[#111118] overflow-hidden shadow-xl transition-colors duration-150">
       {/* Table Action Bar */}
       <div className="px-5 py-4 border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Left: Section Title & Soothing Source Color Palette Legend */}
+        {/* Left: Section Title & Interactive Filter Palettes */}
         <div className="flex flex-col gap-2 min-w-0">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white font-sans tracking-tight">
-            Campaign Performance
-          </h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white font-sans tracking-tight">
+              Campaign Performance
+            </h3>
+            {(selectedSource !== "All" || selectedStatus !== "All" || selectedType !== "All") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSource("All");
+                  setSelectedStatus("All");
+                  setSelectedType("All");
+                }}
+                className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors cursor-pointer border border-rose-200 dark:border-rose-900/40"
+              >
+                Reset All Filters
+              </button>
+            )}
+          </div>
           
-          {/* Soothing Source Palette Legend Blocks */}
+          {/* Interactive Source Palette Filter Buttons */}
           <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899] mr-1">
               Source Palette:
             </span>
             {activeSources.map(src => {
               const item = getLegendColor(src);
+              const isSelected = selectedSource.toLowerCase() === src.toLowerCase();
               return (
-                <div
+                <button
+                  type="button"
                   key={src}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border transition-all shadow-xs ${item.pill}`}
+                  onClick={() => setSelectedSource(prev => prev.toLowerCase() === src.toLowerCase() ? "All" : src)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-xs ${item.pill} ${
+                    isSelected
+                      ? "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-[#111118] font-bold scale-105 shadow-md brightness-105"
+                      : selectedSource !== "All"
+                      ? "opacity-45 hover:opacity-100 hover:scale-102"
+                      : "hover:scale-102 hover:shadow-xs"
+                  }`}
+                  title={isSelected ? `Filtering by ${src}. Click to clear filter.` : `Click to filter by ${src}`}
                 >
                   <span className={`w-2 h-2 rounded-full ${item.dot} shadow-xs shrink-0`} />
                   <span>{src}</span>
-                </div>
+                  {isSelected && (
+                    <span className="ml-0.5 text-[10px] opacity-80 font-mono">✕</span>
+                  )}
+                </button>
               );
             })}
+            {selectedSource !== "All" && (
+              <button
+                type="button"
+                onClick={() => setSelectedSource("All")}
+                className="text-[10px] font-mono text-blue-600 dark:text-blue-400 hover:underline px-1 cursor-pointer"
+              >
+                Clear Source
+              </button>
+            )}
           </div>
           
-          {/* Status Palette Legend Blocks */}
+          {/* Interactive Status Palette Filter Buttons */}
           <div className="flex items-center flex-wrap gap-1.5 pt-0.5 mt-1">
             <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 dark:text-[#888899] mr-1">
               Status Palette:
             </span>
             {["Hot", "Warm", "Cold", "Discovery", "Won", "Lost"].map(status => {
               const dotClass = getStatusDotClasses(status);
+              const isSelected = selectedStatus.toLowerCase() === status.toLowerCase();
               return (
-                <div
+                <button
+                  type="button"
                   key={status}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border transition-all shadow-xs bg-gray-50 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700/50"
+                  onClick={() => setSelectedStatus(prev => prev.toLowerCase() === status.toLowerCase() ? "All" : status)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer shadow-xs bg-gray-50 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700/50 ${
+                    isSelected
+                      ? "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-[#111118] font-bold scale-105 shadow-md bg-blue-50/70 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-600"
+                      : selectedStatus !== "All"
+                      ? "opacity-45 hover:opacity-100 hover:scale-102"
+                      : "hover:scale-102 hover:shadow-xs"
+                  }`}
+                  title={isSelected ? `Filtering by ${status}. Click to clear filter.` : `Click to filter by ${status}`}
                 >
                   <span className={`w-2 h-2 rounded-full ${dotClass} shadow-xs shrink-0`} />
                   <span>{status}</span>
-                </div>
+                  {isSelected && (
+                    <span className="ml-0.5 text-[10px] opacity-80 font-mono">✕</span>
+                  )}
+                </button>
               );
             })}
+            {selectedStatus !== "All" && (
+              <button
+                type="button"
+                onClick={() => setSelectedStatus("All")}
+                className="text-[10px] font-mono text-blue-600 dark:text-blue-400 hover:underline px-1 cursor-pointer"
+              >
+                Clear Status
+              </button>
+            )}
           </div>
         </div>
 
