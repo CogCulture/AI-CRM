@@ -920,9 +920,11 @@ export default function CRMTable({
       {selectedDetailsRow && (() => {
         const companyName = selectedDetailsRow["Company Name"] || selectedDetailsRow["Company"] || "Lead Details";
         const leadId = getLeadId(selectedDetailsRow);
-        const rowSource = getRowSource(selectedDetailsRow);
+        const sNo = selectedDetailsRow["S. No."] || selectedDetailsRow["S. No. "] || selectedDetailsRow["No."] || "";
+        const rowSource = selectedDetailsRow["Lead Source"] || getRowSource(selectedDetailsRow) || "—";
         const rowStatus = getRowStatus(selectedDetailsRow);
-        const dateVal = formatDisplayDate(selectedDetailsRow["Date"]);
+        const rawDate = selectedDetailsRow["Date"] || "";
+        const dateVal = formatDisplayDate(rawDate);
         const pocName = selectedDetailsRow["POC Name"] || selectedDetailsRow["Name"] || "—";
         const contactNo = selectedDetailsRow["Contact No."] || selectedDetailsRow["Phone"] || "—";
         const emailVal = selectedDetailsRow["Email Id"] || selectedDetailsRow["Email"] || selectedDetailsRow["POC email"] || "—";
@@ -930,29 +932,37 @@ export default function CRMTable({
         const stageVal = selectedDetailsRow["Stage"] || "—";
         const cogPoc = selectedDetailsRow["Cog POC"] || "—";
         const remarks = selectedDetailsRow["Remarks /Updates"] || selectedDetailsRow["Last Update"] || selectedDetailsRow["Message from Prospect"] || "—";
+        const revenueEst =
+          selectedDetailsRow["Revenue Estimation (In INR) (Oct 26 - Mar 27)"] ||
+          selectedDetailsRow["Revenue Estimations"] ||
+          selectedDetailsRow["Revenue Estimation"] ||
+          "—";
+        const retainerCost =
+          selectedDetailsRow["Retainer Cost"] ||
+          selectedDetailsRow["Retainer cost"] ||
+          "—";
 
-        // Collect any extra sheet fields not in core cards
+        // Collect any extra sheet fields not already rendered in the main modal sections
         const coreKeys = new Set([
           "Company", "Company Name", "Lead ID", "Source", "Lead Source", "Sources",
           "Status", "Date", "POC Name", "Name", "Contact No.", "Phone",
           "Email Id", "Email", "POC email", "Requirement", "Stage", "Cog POC",
           "Remarks /Updates", "Last Update", "Message from Prospect",
+          "Revenue Estimation (In INR) (Oct 26 - Mar 27)", "Revenue Estimations", "Revenue Estimation",
+          "Retainer Cost", "Retainer cost",
           "S. No.", "S. No. ", "No.",
         ]);
 
         const extraFields = Object.entries(selectedDetailsRow).filter(([k, v]) => {
           if (k.startsWith("_")) return false;
           if (coreKeys.has(k)) return false;
-          if (isActiveLeadsTab && (k.toLowerCase().includes("revenue") || k.toLowerCase().includes("estimation") || k.toLowerCase().includes("retainer"))) {
-            return false;
-          }
           return String(v || "").trim() !== "";
         });
 
         return (
           <>
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" onClick={() => setSelectedDetailsRow(null)} />
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white dark:bg-[#111118] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white dark:bg-[#111118] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[88vh]">
               {/* Modal Header */}
               <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-[#161622]/50">
                 <div className="flex items-center gap-3">
@@ -960,19 +970,22 @@ export default function CRMTable({
                     {companyName.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white font-sans">
                         {companyName}
                       </h3>
                       <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
                         {leadId}
                       </span>
+                      {sNo && (
+                        <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300 border border-gray-200 dark:border-white/10">
+                          S. No. {sNo}
+                        </span>
+                      )}
                     </div>
-                    {rowSource && (
-                      <span className="text-[10px] font-semibold text-gray-400 dark:text-[#888899]">
-                        Source: {rowSource}
-                      </span>
-                    )}
+                    <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899]">
+                      Lead Source: {rowSource}
+                    </span>
                   </div>
                 </div>
                 <button 
@@ -985,11 +998,15 @@ export default function CRMTable({
 
               {/* Modal Body */}
               <div className="p-6 overflow-y-auto space-y-5">
-                {/* Status & Stage Quick Summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-gray-50 dark:bg-[#161622]/60 border border-gray-100 dark:border-white/5">
+                {/* Quick Summary Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 rounded-xl bg-gray-50 dark:bg-[#161622]/60 border border-gray-100 dark:border-white/5">
                   <div>
                     <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Date</span>
-                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 font-mono">{dateVal}</p>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 font-mono" title={rawDate}>{dateVal}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Lead Source</span>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{rowSource}</p>
                   </div>
                   <div>
                     <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Status</span>
@@ -1020,8 +1037,33 @@ export default function CRMTable({
                       <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 font-mono">{contactNo}</p>
                     </div>
                     <div className="p-3 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
-                      <span className="text-[10px] text-gray-400 font-mono uppercase">Email ID</span>
+                      <span className="text-[10px] text-gray-400 font-mono uppercase">Email Id</span>
                       <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 break-all">{emailVal}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Revenue Estimation & Retainer Cost */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono mb-2.5">
+                    Commercials & Revenue Estimation
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-xl border border-emerald-200/60 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.04]">
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono uppercase font-semibold">
+                        Revenue Estimation (In INR) (Oct 26 - Mar 27)
+                      </span>
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-1 font-mono">
+                        {revenueEst !== "—" && !String(revenueEst).startsWith("₹") ? `₹${revenueEst}` : revenueEst}
+                      </p>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-indigo-200/60 dark:border-indigo-500/20 bg-indigo-50/40 dark:bg-indigo-500/[0.04]">
+                      <span className="text-[10px] text-indigo-700 dark:text-indigo-400 font-mono uppercase font-semibold">
+                        Retainer Cost
+                      </span>
+                      <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mt-1 font-mono">
+                        {retainerCost !== "—" && !String(retainerCost).startsWith("₹") ? `₹${retainerCost}` : retainerCost}
+                      </p>
                     </div>
                   </div>
                 </div>

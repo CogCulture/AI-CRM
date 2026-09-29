@@ -208,7 +208,7 @@ export default function ProposalTrackerView({
 
     allProposals.forEach(row => {
       const colId = getProposalColumnId(row);
-      const rawVal = String(row[valueCol] || "").replace(/[^0-9.-]/g, "");
+      const rawVal = String(row[valueCol] || "").split("(")[0].replace(/[^0-9.-]/g, "");
       const numVal = parseFloat(rawVal) || 0;
 
       totalPipelineValue += numVal;
@@ -503,7 +503,7 @@ export default function ProposalTrackerView({
           {STAGE_COLUMNS.map((col) => {
             const columnProposals = filteredProposals.filter(r => getProposalColumnId(r) === col.id);
             const columnTotalValue = columnProposals.reduce((sum, r) => {
-              const num = parseFloat(String(r[valueCol] || "").replace(/[^0-9.-]/g, "")) || 0;
+              const num = parseFloat(String(r[valueCol] || "").split("(")[0].replace(/[^0-9.-]/g, "")) || 0;
               return sum + num;
             }, 0);
 

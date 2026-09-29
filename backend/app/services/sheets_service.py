@@ -349,7 +349,22 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                             stage = _derive_sept_stage(remarks, req, st)
                             lid = f"COG-S{s_idx + 1}"
 
+                            rev_est = (
+                                s_dict.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)")
+                                or s_dict.get("Revenue Estimations")
+                                or s_dict.get("Revenue Estimation")
+                                or ""
+                            )
+                            ret_cost = (
+                                s_dict.get("Retainer Cost")
+                                or s_dict.get("Retainer cost")
+                                or ""
+                            )
+
                             unified_row = {h: "" for h in headers}
+                            # Copy all exact columns from the 'Active Leads from Sept ' sheet verbatim
+                            unified_row.update(s_dict)
+                            # Also populate normalized CRM keys for cross-tab compatibility
                             unified_row.update({
                                 "Lead ID": lid,
                                 "Date": s_dict.get("Date") or "",
@@ -359,6 +374,7 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                                 "Stage": stage,
                                 "Cog POC": s_dict.get("Cog POC") or "",
                                 "Source": s_dict.get("Lead Source") or "",
+                                "Lead Source": s_dict.get("Lead Source") or "",
                                 "Name": s_dict.get("POC Name") or "",
                                 "POC Name": s_dict.get("POC Name") or "",
                                 "Phone": s_dict.get("Contact No.") or "",
@@ -367,6 +383,10 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                                 "Email Id": s_dict.get("Email Id") or "",
                                 "Last Update": remarks,
                                 "Remarks /Updates": remarks,
+                                "Revenue Estimations": rev_est,
+                                "Revenue Estimation (In INR) (Oct 26 - Mar 27)": rev_est,
+                                "Retainer cost": ret_cost,
+                                "Retainer Cost": ret_cost,
                                 "S. No.": str(s_no),
                                 "_row_num": 10000 + s_idx + 2,
                                 "_sheet_tab": sept_tab_title,
@@ -374,8 +394,8 @@ def fetch_sheet_data(sheet_url: str, range_name: str = "Sheet1", bypass_cache: b
                             })
                             sept_rows.append(unified_row)
 
-                        for extra_h in ["POC Name", "Contact No.", "Email Id", "Remarks /Updates"]:
-                            if extra_h not in headers:
+                        for extra_h in sept_raw_headers:
+                            if extra_h and extra_h not in headers:
                                 headers.append(extra_h)
 
                         # Prepend September leads so newest maintained leads appear first
@@ -638,18 +658,21 @@ def update_lead_row(sheet_url: str, range_name: str, row_num: int, lead_data: di
 
         # Field alias mapping for Sept tab if target is Sept tab
         alias_map = {
-            "Lead Source": clean_data.get("Source") or clean_data.get("Lead Source", ""),
-            "POC Name": clean_data.get("Name") or clean_data.get("POC Name", ""),
-            "Contact No.": clean_data.get("Phone") or clean_data.get("Contact No.", ""),
-            "Email Id": clean_data.get("Email") or clean_data.get("Email Id", ""),
-            "Remarks /Updates": clean_data.get("Last Update") or clean_data.get("Remarks /Updates", ""),
+            "Lead Source": clean_data.get("Lead Source") or clean_data.get("Source", ""),
+            "POC Name": clean_data.get("POC Name") or clean_data.get("Name", ""),
+            "Contact No.": clean_data.get("Contact No.") or clean_data.get("Phone", ""),
+            "Email Id": clean_data.get("Email Id") or clean_data.get("Email", ""),
+            "Remarks /Updates": clean_data.get("Remarks /Updates") or clean_data.get("Last Update", ""),
+            "Revenue Estimation (In INR) (Oct 26 - Mar 27)": clean_data.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or clean_data.get("Revenue Estimations", ""),
+            "Retainer Cost": clean_data.get("Retainer Cost") or clean_data.get("Retainer cost", ""),
         }
         for ak, av in alias_map.items():
             if av and not clean_data.get(ak):
                 clean_data[ak] = av
         
-        # Auto-add any new non-empty columns (e.g. Tender Detail fields) to sheet headers
-        new_cols = [k for k, v in clean_data.items() if k not in deduped_headers and v != ""]
+        # Auto-add any new non-empty columns (e.g. Tender Detail fields) to sheet headers (skip synthetic aliases on Sept tab)
+        sept_ignore_aliases = {"Source", "Name", "Phone", "Email", "Last Update", "Revenue Estimations", "Retainer cost", "Lead ID", "Stage"} if is_sept_lead else set()
+        new_cols = [k for k, v in clean_data.items() if k not in deduped_headers and k not in sept_ignore_aliases and v != ""]
         if new_cols:
             try:
                 updated_headers = headers + new_cols
