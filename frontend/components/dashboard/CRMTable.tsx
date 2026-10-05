@@ -114,10 +114,31 @@ const getLeadId = (row: Record<string, any>): string => {
 const getRowSource = (row: Record<string, any>): string => {
   for (const [k, v] of Object.entries(row)) {
     const kLower = k.toLowerCase().trim();
-    if (kLower === "source" || kLower === "sources" || kLower.includes("source") || kLower.includes("lead source")) {
+    if (
+      kLower === "source" || 
+      kLower === "sources" || 
+      kLower.includes("source") || 
+      kLower.includes("lead source") ||
+      kLower === "lead type" ||
+      kLower.includes("lead type")
+    ) {
       const val = String(v || "").trim();
       if (val) return val;
     }
+  }
+  return "";
+};
+
+// Helper to retrieve column value case-insensitively with alias support
+const getRowVal = (row: Record<string, any>, colName: string): any => {
+  if (row[colName] !== undefined && row[colName] !== null && String(row[colName]).trim() !== "") {
+    return row[colName];
+  }
+  if (colName === "Company" && row["Company Name"]) return row["Company Name"];
+  if (colName === "Company Name" && row["Company"]) return row["Company"];
+  const lower = colName.toLowerCase().trim();
+  for (const [k, v] of Object.entries(row)) {
+    if (k.toLowerCase().trim() === lower) return v;
   }
   return "";
 };
@@ -300,10 +321,11 @@ export default function CRMTable({
   // Inject "Lead ID" at the very beginning of the active columns list (filtering out any duplicates)
   let activeCols = ["Lead ID", ...activeColsRaw.filter((col) => col !== "Lead ID")];
   
-  // Check if we are on Active Leads tab (default tab in dashboard)
+  // Check if we are on Active Leads tab (default tab in dashboard) or Internal Leads tab
   const isActiveLeadsTab = !isTenderDashboard && (currentTab === "active_leads" || currentTab === "dashboard" || !currentTab);
+  const isInternalLeadsTab = currentTab === "internal_leads";
 
-  if (isActiveLeadsTab) {
+  if (isActiveLeadsTab || isInternalLeadsTab) {
     // Strictly display ONLY the 7 requested columns in this exact order:
     // Lead ID, Date, Company Name, Requirement, Stage, Status, Cog POC
     activeCols = ["Lead ID", "Date", "Company", "Requirement", "Stage", "Status", "Cog POC"];
@@ -321,12 +343,6 @@ export default function CRMTable({
         return false;
       }
       return true;
-    });
-  } else if (currentTab === "internal_leads") {
-    // For Internal Leads, show core columns
-    activeCols = activeCols.filter(col => {
-      const colLower = col.toLowerCase().trim();
-      return colLower !== "status (1)";
     });
   }
 
@@ -373,8 +389,8 @@ export default function CRMTable({
   const sortedRows = [...filteredRows];
   if (sortColumn) {
     sortedRows.sort((a, b) => {
-      let valA = sortColumn === "Lead ID" ? getLeadId(a) : (a[sortColumn] || "");
-      let valB = sortColumn === "Lead ID" ? getLeadId(b) : (b[sortColumn] || "");
+      let valA = sortColumn === "Lead ID" ? getLeadId(a) : (getRowVal(a, sortColumn) ?? "");
+      let valB = sortColumn === "Lead ID" ? getLeadId(b) : (getRowVal(b, sortColumn) ?? "");
       
       const numA = parseFloat(String(valA).replace(/[^0-9.-]/g, ""));
       const numB = parseFloat(String(valB).replace(/[^0-9.-]/g, ""));
@@ -649,13 +665,15 @@ export default function CRMTable({
           </div>
 
           {/* Configure Columns Trigger */}
-          <button
-            onClick={() => setIsManagerOpen(true)}
-            className="p-1.5 bg-white hover:bg-gray-50 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
-            title="Configure Columns"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          </button>
+          {!isActiveLeadsTab && !isInternalLeadsTab && (
+            <button
+              onClick={() => setIsManagerOpen(true)}
+              className="p-1.5 bg-white hover:bg-gray-50 dark:bg-[#161622] dark:hover:bg-[#1C1C2D] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] text-gray-500 dark:text-[#888899] hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              title="Configure Columns"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -701,7 +719,7 @@ export default function CRMTable({
                     style={{ animationDelay: `${rowIdx * 30}ms` }}
                   >
                   {activeCols.map((col, idx) => {
-                    const cellVal = col === "Lead ID" ? getLeadId(row) : String(row[col] || "");
+                    const cellVal = col === "Lead ID" ? getLeadId(row) : String(getRowVal(row, col) ?? "");
                     const isNo = col.toLowerCase() === "no.";
                     const isCampaign = col.toLowerCase() === "campaign";
                     const isValue = ["value", "amount", "revenue", "estimations", "deal size"].some(x => col.toLowerCase().includes(x));
@@ -1002,20 +1020,22 @@ export default function CRMTable({
 
       {/* Lead Details Modal */}
       {selectedDetailsRow && (() => {
-        const companyName = selectedDetailsRow["Company Name"] || selectedDetailsRow["Company"] || "Lead Details";
+        const companyName = getRowVal(selectedDetailsRow, "Company") || getRowVal(selectedDetailsRow, "Company Name") || "Lead Details";
         const leadId = getLeadId(selectedDetailsRow);
         const sNo = selectedDetailsRow["S. No."] || selectedDetailsRow["S. No. "] || selectedDetailsRow["No."] || "";
-        const rowSource = selectedDetailsRow["Lead Source"] || getRowSource(selectedDetailsRow) || "—";
+        const rowSource = selectedDetailsRow["Lead Source"] || selectedDetailsRow["Lead Type"] || getRowSource(selectedDetailsRow) || "—";
         const rowStatus = getRowStatus(selectedDetailsRow);
-        const rawDate = selectedDetailsRow["Date"] || "";
+        const rawDate = getRowVal(selectedDetailsRow, "Date") || "";
         const dateVal = formatDisplayDate(rawDate);
         const pocName = selectedDetailsRow["POC Name"] || selectedDetailsRow["Name"] || "—";
         const contactNo = selectedDetailsRow["Contact No."] || selectedDetailsRow["Phone"] || "—";
-        const emailVal = selectedDetailsRow["Email Id"] || selectedDetailsRow["Email"] || selectedDetailsRow["POC email"] || "—";
-        const requirement = selectedDetailsRow["Requirement"] || "—";
-        const stageVal = selectedDetailsRow["Stage"] || "—";
-        const cogPoc = selectedDetailsRow["Cog POC"] || "—";
-        const remarks = selectedDetailsRow["Remarks /Updates"] || selectedDetailsRow["Last Update"] || selectedDetailsRow["Message from Prospect"] || "—";
+        const emailVal = selectedDetailsRow["Email Id"] || selectedDetailsRow["Email"] || "—";
+        const requirement = getRowVal(selectedDetailsRow, "Requirement") || "—";
+        const stageVal = getRowVal(selectedDetailsRow, "Stage") || "—";
+        const cogPoc = getRowVal(selectedDetailsRow, "Cog POC") || "—";
+        const cogPocEmail = selectedDetailsRow["POC email"] || selectedDetailsRow["Cog POC Email"] || "";
+        const remarks = selectedDetailsRow["Remarks /Updates"] || selectedDetailsRow["Last Update"] || "—";
+        const messageFromProspect = selectedDetailsRow["Message from Prospect"] || "";
         const revenueEst =
           selectedDetailsRow["Revenue Estimation (In INR) (Oct 26 - Mar 27)"] ||
           selectedDetailsRow["Revenue Estimations"] ||
@@ -1030,12 +1050,19 @@ export default function CRMTable({
         const coreKeys = new Set([
           "Company", "Company Name", "Lead ID", "Source", "Lead Source", "Sources",
           "Status", "Date", "POC Name", "Name", "Contact No.", "Phone",
-          "Email Id", "Email", "POC email", "Requirement", "Stage", "Cog POC",
-          "Remarks /Updates", "Last Update", "Message from Prospect",
+          "Email Id", "Email", "Requirement", "Stage", "Cog POC",
+          "Remarks /Updates", "Last Update",
           "Revenue Estimation (In INR) (Oct 26 - Mar 27)", "Revenue Estimations", "Revenue Estimation",
           "Retainer Cost", "Retainer cost",
           "S. No.", "S. No. ", "No.",
         ]);
+        if (cogPocEmail) {
+          coreKeys.add("POC email");
+          coreKeys.add("Cog POC Email");
+        }
+        if (messageFromProspect) {
+          coreKeys.add("Message from Prospect");
+        }
 
         const extraFields = Object.entries(selectedDetailsRow).filter(([k, v]) => {
           if (k.startsWith("_")) return false;
@@ -1068,7 +1095,7 @@ export default function CRMTable({
                       )}
                     </div>
                     <span className="text-[11px] font-semibold text-gray-500 dark:text-[#888899]">
-                      Lead Source: {rowSource}
+                      Source / Type: {rowSource}
                     </span>
                   </div>
                 </div>
@@ -1089,7 +1116,7 @@ export default function CRMTable({
                     <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5 font-mono" title={rawDate}>{dateVal}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Lead Source</span>
+                    <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Source / Type</span>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{rowSource}</p>
                   </div>
                   <div>
@@ -1103,6 +1130,11 @@ export default function CRMTable({
                   <div>
                     <span className="text-[10px] font-mono uppercase text-gray-400 dark:text-[#888899]">Cog POC</span>
                     <p className="text-xs font-semibold text-gray-900 dark:text-white mt-0.5">{cogPoc}</p>
+                    {cogPocEmail && (
+                      <p className="text-[9px] text-gray-400 dark:text-[#888899] font-mono truncate mt-0.5" title={cogPocEmail}>
+                        {cogPocEmail}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1135,7 +1167,7 @@ export default function CRMTable({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-3.5 rounded-xl border border-emerald-200/60 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.04]">
                       <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono uppercase font-semibold">
-                        Revenue Estimation (In INR) (Oct 26 - Mar 27)
+                        Revenue Estimation
                       </span>
                       <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-1 font-mono">
                         {revenueEst !== "—" && !String(revenueEst).startsWith("₹") ? `₹${revenueEst}` : revenueEst}
@@ -1162,6 +1194,16 @@ export default function CRMTable({
                       {requirement}
                     </p>
                   </div>
+                  {messageFromProspect && (
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono">
+                        Message from Prospect
+                      </span>
+                      <p className="mt-1 p-3 text-xs text-gray-800 dark:text-gray-200 bg-gray-50/60 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-xl leading-relaxed whitespace-pre-wrap">
+                        {messageFromProspect}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <span className="text-[10px] font-bold text-gray-400 dark:text-[#888899] uppercase tracking-wider font-mono">
                       Remarks / Updates
