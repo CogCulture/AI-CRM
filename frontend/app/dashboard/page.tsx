@@ -888,29 +888,11 @@ function DashboardContent() {
 
           {/* Row 2: Visual Insights & Status Donut Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {tab === "internal_leads" ? (
-              <div className="lg:col-span-2 min-w-0 flex flex-col">
-                {filteredSheetData && (
-                  <RevenueAnalysisWidget sheetData={filteredSheetData} />
-                )}
-              </div>
-            ) : (
-              <div className="lg:col-span-2 min-w-0 flex flex-col">
-                {sheetData && (
-                  <GraphWidget
-                    graph={{
-                      id: "lead-channels",
-                      type: "bar",
-                      title: "Lead Acquisition by Channel",
-                      x_col: "Source",
-                      y_col: ""
-                    }}
-                    rows={filteredRows}
-                    height={260}
-                  />
-                )}
-              </div>
-            )}
+            <div className="lg:col-span-2 min-w-0 flex flex-col">
+              {filteredSheetData && (
+                <RevenueAnalysisWidget sheetData={filteredSheetData} />
+              )}
+            </div>
 
             {/* Donut Chart: Lead Status Breakdown */}
             <div className="lg:col-span-1 min-w-0 flex flex-col">

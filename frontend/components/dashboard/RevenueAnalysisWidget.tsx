@@ -64,7 +64,7 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
   // Resolve estimated revenue column
   const revenueHeader = sheetData.headers.find(h => {
     const hl = h.toLowerCase();
-    return hl.includes("estimated") || hl.includes("est") || hl.includes("revenue");
+    return hl.includes("estimated") || hl.includes("est") || hl.includes("revenue") || hl.includes("estimation");
   }) || sheetData.headers.find(h => {
     const hl = h.toLowerCase();
     return hl.includes("value") || hl.includes("amount") || hl.includes("deal size");
@@ -85,17 +85,17 @@ export default function RevenueAnalysisWidget({ sheetData }: RevenueAnalysisWidg
   const monthlyDataMap: Record<string, { won: number; lost: number }> = {};
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-  if (!isMock && sheetData.rows && revenueHeader) {
+  if (!isMock && sheetData.rows) {
     sheetData.rows.forEach(row => {
       let revVal = 0;
       if (revenueHeader && row[revenueHeader] !== undefined && row[revenueHeader] !== "") {
-        const revStr = String(row[revenueHeader]);
+        const revStr = String(row[revenueHeader]).split("(")[0];
         revVal = parseFloat(revStr.replace(/[^0-9.-]/g, "")) || 0;
       } else {
         for (const [k, v] of Object.entries(row)) {
           const kl = k.toLowerCase();
           if (kl.includes("revenue") || kl.includes("estimation") || kl.includes("value") || kl.includes("amount")) {
-            const revStr = String(v || "");
+            const revStr = String(v || "").split("(")[0];
             revVal = parseFloat(revStr.replace(/[^0-9.-]/g, "")) || 0;
             if (revVal > 0) break;
           }
