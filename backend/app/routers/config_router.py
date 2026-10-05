@@ -14,6 +14,9 @@ class ConfigUpdate(BaseModel):
     graphs: Optional[List[dict]] = None
     report_recipients: Optional[List[str]] = None
     mandatory_columns: Optional[List[str]] = None
+    email_test_mode: Optional[bool] = None
+    email_test_recipient: Optional[str] = None
+    email_prod_recipients: Optional[List[str]] = None
 
 @router.get("/")
 def get_config():

@@ -27,7 +27,7 @@ from app.services.alert_service import check_and_send_alerts
 def health(): return {"status": "ok"}
 
 async def schedule_daily_tasks():
-    """Background task to check deadlines and send daily reports at 11:30 AM local time."""
+    """Background task to dispatch daily lead digests and proposal follow-up alerts at 10:00 AM IST."""
     # Let server boot fully first (wait 10 seconds)
     await asyncio.sleep(10)
     print("Background daily scheduler started (polls every 60 seconds)...")
@@ -36,15 +36,26 @@ async def schedule_daily_tasks():
             from datetime import datetime, timedelta
             # local time (UTC+5:30)
             local_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-            if local_now.hour == 11 and local_now.minute == 30:
-                print(f"Daily scheduler trigger: time is {local_now.strftime('%H:%M')} (+05:30). Processing reports and alerts...")
+            
+            # Daily 10:00 AM IST automation trigger
+            if local_now.hour == 10 and local_now.minute == 0:
+                print(f"Daily 10:00 AM IST scheduler trigger: processing daily digests and alerts...")
                 
-                # 1. Dispatch Daily Metrics Snapshot
+                # 1. Dispatch Daily Leads & New Intake Digest (Leads added yesterday, status, follow-up, source, hot leads)
+                from app.services.email_service import dispatch_daily_leads_digest, dispatch_proposals_followup_alert
+                dispatch_daily_leads_digest()
+                
+                # 2. Dispatch Daily Proposals & Follow-up Action Alert (Proposals today, Day 2/5/overdue cadence)
+                dispatch_proposals_followup_alert()
+                
+                # 3. Check deadlines
+                check_and_send_alerts()
+
+            # Optional 11:30 AM metrics snapshot
+            elif local_now.hour == 11 and local_now.minute == 30:
                 from app.services.report_service import send_daily_metrics_report
                 send_daily_metrics_report()
-                
-                # 2. Dispatch approaching Deadline Alerts
-                check_and_send_alerts()
+
         except Exception as e:
             print(f"Error in scheduled daily tasks: {e}")
         # Poll every 60 seconds

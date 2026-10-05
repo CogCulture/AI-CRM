@@ -19,6 +19,9 @@ export interface Config {
   graphs: GraphConfig[];
   report_recipients?: string[];
   mandatory_columns?: string[];
+  email_test_mode?: boolean;
+  email_test_recipient?: string;
+  email_prod_recipients?: string[];
 }
 
 export interface GraphConfig {

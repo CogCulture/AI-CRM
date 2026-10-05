@@ -199,4 +199,43 @@ def trigger_daily_report():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.post("/trigger-daily-leads-digest")
+def trigger_daily_leads_digest(override_recipient: str = None):
+    """Trigger the Daily Leads & New Intake Digest email dispatch immediately."""
+    from app.services.email_service import dispatch_daily_leads_digest
+    try:
+        result = dispatch_daily_leads_digest(override_recipient=override_recipient)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.post("/trigger-proposals-followup-alert")
+def trigger_proposals_followup_alert(override_recipient: str = None):
+    """Trigger the Daily Proposals & Follow-up Action Alert email dispatch immediately."""
+    from app.services.email_service import dispatch_proposals_followup_alert
+    try:
+        result = dispatch_proposals_followup_alert(override_recipient=override_recipient)
+        return result
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.get("/preview-daily-leads-digest")
+def preview_daily_leads_digest(override_recipient: str = None):
+    """Preview HTML and metadata for the Daily Leads & New Intake Digest."""
+    from app.services.email_service import preview_daily_leads_digest
+    try:
+        return preview_daily_leads_digest(override_recipient=override_recipient)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/preview-proposals-followup-alert")
+def preview_proposals_followup_alert(override_recipient: str = None):
+    """Preview HTML and metadata for the Daily Proposals & Follow-up Action Alert."""
+    from app.services.email_service import preview_proposals_followup_alert
+    try:
+        return preview_proposals_followup_alert(override_recipient=override_recipient)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 

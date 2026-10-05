@@ -62,4 +62,13 @@ export const api = {
       return res.json();
     });
   },
+  triggerDailyLeadsDigest: (overrideRecipient?: string) =>
+    apiFetch<any>(`/api/dashboard/trigger-daily-leads-digest${overrideRecipient ? `?override_recipient=${encodeURIComponent(overrideRecipient)}` : ""}`, { method: "POST" }),
+  triggerProposalsFollowupAlert: (overrideRecipient?: string) =>
+    apiFetch<any>(`/api/dashboard/trigger-proposals-followup-alert${overrideRecipient ? `?override_recipient=${encodeURIComponent(overrideRecipient)}` : ""}`, { method: "POST" }),
+  previewDailyLeadsDigest: (overrideRecipient?: string) =>
+    apiFetch<{ subject: string; html: string; recipients: string[]; is_test_mode: boolean; new_leads_count: number; hot_leads_count: number }>(`/api/dashboard/preview-daily-leads-digest${overrideRecipient ? `?override_recipient=${encodeURIComponent(overrideRecipient)}` : ""}`),
+  previewProposalsFollowupAlert: (overrideRecipient?: string) =>
+    apiFetch<{ subject: string; html: string; recipients: string[]; is_test_mode: boolean; proposals_today_count: number; followups_due_count: number }>(`/api/dashboard/preview-proposals-followup-alert${overrideRecipient ? `?override_recipient=${encodeURIComponent(overrideRecipient)}` : ""}`),
 };
+

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircle2, XCircle, AlertCircle, Database, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, ShieldCheck, Save, Mail, Trash2, Plus, ClipboardList } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Database, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, ShieldCheck, Save, Mail, Trash2, Plus, ClipboardList, Send, Eye, X, Sparkles, Clock, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Config } from "@/lib/types";
@@ -114,6 +114,122 @@ export default function SheetConfigurator() {
     }
   };
 
+  // Automated Daily Email Center States
+  const [emailTestMode, setEmailTestMode] = useState<boolean>(true);
+  const [testRecipientInput, setTestRecipientInput] = useState<string>("kanishk@cogculture.agency");
+  const [prodRecipients, setProdRecipients] = useState<string[]>([
+    "kanika@cogculture.agency",
+    "vaibhav@cogculture.agency",
+    "daksh@cogculture.agency"
+  ]);
+  const [isSendingLeads, setIsSendingLeads] = useState<boolean>(false);
+  const [isSendingProposals, setIsSendingProposals] = useState<boolean>(false);
+  const [isSendingBoth, setIsSendingBoth] = useState<boolean>(false);
+
+  // Preview Modal States
+  const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false);
+  const [previewTitle, setPreviewTitle] = useState<string>("");
+  const [previewSubject, setPreviewSubject] = useState<string>("");
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [previewRecipients, setPreviewRecipients] = useState<string[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
+
+  const handleToggleTestMode = async (mode: boolean) => {
+    try {
+      await api.updateConfig({ email_test_mode: mode });
+      setEmailTestMode(mode);
+      setConfig(prev => ({ ...prev, email_test_mode: mode }));
+      toast.success(mode ? "Testing Mode Active (kanishk@cogculture.agency)" : "Production Mode Active (Executive Team)");
+    } catch (err: any) {
+      toast.error("Failed to update test mode");
+    }
+  };
+
+  const handleSaveTestRecipient = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!testRecipientInput.trim() || !testRecipientInput.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    try {
+      await api.updateConfig({ email_test_recipient: testRecipientInput.trim() });
+      setConfig(prev => ({ ...prev, email_test_recipient: testRecipientInput.trim() }));
+      toast.success(`Test recipient updated to ${testRecipientInput.trim()}`);
+    } catch (err: any) {
+      toast.error("Failed to update test recipient");
+    }
+  };
+
+  const handleTriggerLeadsDigest = async () => {
+    setIsSendingLeads(true);
+    try {
+      const res = await api.triggerDailyLeadsDigest(emailTestMode ? testRecipientInput : undefined);
+      if (res && res.success) {
+        toast.success(`Daily Leads Email dispatched successfully to ${res.recipients.join(", ")}!`);
+      } else {
+        toast.error(res?.error || "Failed to dispatch leads email");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to dispatch leads email");
+    } finally {
+      setIsSendingLeads(false);
+    }
+  };
+
+  const handleTriggerProposalsAlert = async () => {
+    setIsSendingProposals(true);
+    try {
+      const res = await api.triggerProposalsFollowupAlert(emailTestMode ? testRecipientInput : undefined);
+      if (res && res.success) {
+        toast.success(`Proposals & Follow-ups Alert dispatched successfully to ${res.recipients.join(", ")}!`);
+      } else {
+        toast.error(res?.error || "Failed to dispatch proposals alert");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to dispatch proposals alert");
+    } finally {
+      setIsSendingProposals(false);
+    }
+  };
+
+  const handleTriggerBothEmails = async () => {
+    setIsSendingBoth(true);
+    try {
+      await handleTriggerLeadsDigest();
+      await handleTriggerProposalsAlert();
+      toast.success("Both daily CRM intelligence emails were dispatched!");
+    } catch (err: any) {
+      toast.error("Error triggering both emails");
+    } finally {
+      setIsSendingBoth(false);
+    }
+  };
+
+  const handleOpenPreview = async (type: "leads" | "proposals") => {
+    setIsLoadingPreview(true);
+    setPreviewModalOpen(true);
+    try {
+      if (type === "leads") {
+        setPreviewTitle("Email 1: Daily Leads & New Intake Digest");
+        const res = await api.previewDailyLeadsDigest(emailTestMode ? testRecipientInput : undefined);
+        setPreviewSubject(res.subject);
+        setPreviewHtml(res.html);
+        setPreviewRecipients(res.recipients);
+      } else {
+        setPreviewTitle("Email 2: Daily Proposals & Follow-up Action Alert");
+        const res = await api.previewProposalsFollowupAlert(emailTestMode ? testRecipientInput : undefined);
+        setPreviewSubject(res.subject);
+        setPreviewHtml(res.html);
+        setPreviewRecipients(res.recipients);
+      }
+    } catch (err: any) {
+      toast.error("Failed to load email preview: " + err.message);
+      setPreviewModalOpen(false);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
   const handleAddTab = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const tabName = newTabInput.trim();
@@ -139,6 +255,11 @@ export default function SheetConfigurator() {
     try {
       const cfg = await api.getConfig();
       setConfig(cfg);
+      if (cfg.email_test_mode !== undefined) setEmailTestMode(cfg.email_test_mode);
+      if (cfg.email_test_recipient) setTestRecipientInput(cfg.email_test_recipient);
+      if (cfg.email_prod_recipients && cfg.email_prod_recipients.length > 0) {
+        setProdRecipients(cfg.email_prod_recipients);
+      }
       
       const isSheetsMode = cfg.sheet_url && cfg.sheet_url !== "mock" && cfg.sheet_url !== "local_db";
       setActiveTab(isSheetsMode ? "sheets" : "local");
@@ -818,67 +939,204 @@ export default function SheetConfigurator() {
         )}
       </div>
 
-      {/* Daily Metrics Reports Card */}
-      <div className="bg-white dark:bg-[#0C0C12]/20 rounded-xl p-6 border border-gray-200 dark:border-[rgba(255,255,255,0.06)] shadow-xl space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
-            <Mail className="w-5 h-5" />
+      {/* Automated Daily CRM Email Intelligence Center */}
+      <div className="bg-white dark:bg-[#0C0C12]/40 rounded-xl p-6 border border-gray-200 dark:border-[rgba(255,255,255,0.08)] shadow-2xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 dark:border-white/5 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-indigo-400">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-wide">
+                  Daily CRM Email Intelligence Center
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  Daily 10:00 AM IST
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-[#888899] mt-0.5">
+                Automated morning dispatch for new leads intake and proposal follow-up cadence
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-white tracking-wide">
-              Daily Metrics Email Reports
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-[#888899]">
-              Configure recipients to receive a daily dashboard metrics snapshot at 11:30 AM (local time)
-            </p>
+
+          {/* Mode Switcher */}
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-white/5 p-1 rounded-lg border border-gray-200 dark:border-white/5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => handleToggleTestMode(true)}
+              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                emailTestMode
+                  ? "bg-amber-500 text-black font-bold shadow-sm"
+                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              🧪 Test Mode (Kanishk)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleTestMode(false)}
+              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                !emailTestMode
+                  ? "bg-emerald-600 text-white font-bold shadow-sm"
+                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              🚀 Production Mode (Team)
+            </button>
           </div>
         </div>
 
-        <form onSubmit={handleAddRecipient} className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1">
+        {/* Current Recipient Status Banner */}
+        <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+          emailTestMode 
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200" 
+            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+        }`}>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm">
+                {emailTestMode ? "⚠️ Test Mode Active" : "✅ Production Delivery Active"}
+              </span>
+              <span className="text-xs opacity-80 font-mono">
+                {emailTestMode 
+                  ? `(Target: ${testRecipientInput})` 
+                  : "(Target: kanika@, vaibhav@, daksh@)"}
+              </span>
+            </div>
+            <p className="text-xs opacity-75 mt-0.5">
+              {emailTestMode
+                ? "Safe testing environment. Production recipients are locked out from automated dispatches until toggled."
+                : "Live automated distribution enabled for Kanika, Vaibhav, and Daksh."}
+            </p>
+          </div>
+
+          {emailTestMode && (
+            <div className="flex items-center gap-2">
               <input
                 type="email"
-                placeholder="recipient@example.com"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                className="w-full px-4 py-2 text-sm bg-gray-55 dark:bg-[rgba(255,255,255,0.02)] border border-gray-200 dark:border-[rgba(255,255,255,0.06)] focus:border-emerald-500 rounded-lg text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-[#555566] transition-all outline-none"
+                value={testRecipientInput}
+                onChange={(e) => setTestRecipientInput(e.target.value)}
+                placeholder="kanishk@cogculture.agency"
+                className="px-3 py-1.5 text-xs bg-white dark:bg-black/40 border border-amber-500/30 rounded-lg text-gray-900 dark:text-white font-mono outline-none w-56"
               />
-            </div>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-            >
-              <Plus className="w-4 h-4" /> Add
-            </button>
-          </div>
-        </form>
-
-        {/* Recipients List */}
-        <div className="space-y-2">
-          <p className="text-xs font-mono uppercase tracking-wider text-gray-500 dark:text-[#888899]">
-            Active Recipients ({config.report_recipients?.length || 0})
-          </p>
-          {(!config.report_recipients || config.report_recipients.length === 0) ? (
-            <p className="text-xs text-gray-400 dark:text-[#555566] italic py-1">
-              No daily report recipients configured. Reports will not be sent.
-            </p>
-          ) : (
-            <div className="divide-y divide-gray-100 dark:divide-white/5 border border-gray-100 dark:border-white/5 rounded-lg overflow-hidden bg-gray-55/30 dark:bg-white/1">
-              {config.report_recipients.map((email) => (
-                <div key={email} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="text-gray-750 dark:text-gray-300 font-mono">{email}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRecipient(email)}
-                    className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+              <button
+                type="button"
+                onClick={handleSaveTestRecipient}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-lg transition-all cursor-pointer"
+              >
+                Save
+              </button>
             </div>
           )}
+        </div>
+
+        {/* 2 Email Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Card 1: Leads Digest */}
+          <div className="p-5 rounded-xl border border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                  Email 1
+                </span>
+                <span className="text-[11px] font-mono text-gray-400">Daily Intake</span>
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-2">
+                Daily Leads & New Intake Digest
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-3">
+                Sends a full summary of all leads added yesterday, their status (Hot/Warm/Cold), follow-up action date/notes, lead source, Cog POC, and the complete active Hot leads pulse.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-white/5">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Target Scope:</span>
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Yesterday's Leads + Hot Pulse</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPreview("leads")}
+                  className="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Preview Email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTriggerLeadsDigest}
+                  disabled={isSendingLeads}
+                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  {isSendingLeads ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  {isSendingLeads ? "Sending..." : "Send Leads Email Now"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Proposals Alert */}
+          <div className="p-5 rounded-xl border border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  Email 2
+                </span>
+                <span className="text-[11px] font-mono text-gray-400">Deal Velocity</span>
+              </div>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-2">
+                Daily Proposals & Follow-up Action Alert
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-3">
+                Focuses on deals in motion: proposals to be sent today, plus strict follow-up cadence reminders (Day 2 first follow-up, Day 5 second follow-up, and daily overdue alerts until status changes).
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-white/5">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Cadence Rules:</span>
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Day 2 • Day 5 • Overdue Daily</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPreview("proposals")}
+                  className="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Preview Email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTriggerProposalsAlert}
+                  disabled={isSendingProposals}
+                  className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-500/20 cursor-pointer"
+                >
+                  {isSendingProposals ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  {isSendingProposals ? "Sending..." : "Send Proposals Alert Now"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Dispatch & Automation Status */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-gray-100 dark:border-white/5">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <Clock className="w-4 h-4 text-emerald-500" />
+            <span>Automatic Schedule: Armed to run daily at <strong>10:00 AM IST</strong></span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleTriggerBothEmails}
+            disabled={isSendingBoth}
+            className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+          >
+            {isSendingBoth ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isSendingBoth ? "Dispatching Both..." : "Dispatch Both Emails Now (Test Run)"}
+          </button>
         </div>
       </div>
 
@@ -935,6 +1193,57 @@ export default function SheetConfigurator() {
           </div>
         )}
       </div>
+
+      {/* Live Email Preview Modal */}
+      {previewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-[#111118] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-150 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02]">
+              <div>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-indigo-400" />
+                  {previewTitle}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Subject: <strong className="text-gray-800 dark:text-gray-200">{previewSubject || "Generating..."}</strong> • Target: <span className="font-mono text-indigo-400">{previewRecipients.join(", ") || (emailTestMode ? testRecipientInput : "kanika@, vaibhav@, daksh@")}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-gray-100 dark:bg-[#0a0a0f] p-4">
+              {isLoadingPreview ? (
+                <div className="flex items-center justify-center h-96 text-gray-400 gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin" /> Generating live preview from sheets...
+                </div>
+              ) : (
+                <iframe
+                  srcDoc={previewHtml}
+                  title="Email Preview"
+                  className="w-full h-[65vh] border-0 rounded-lg shadow-inner bg-white"
+                />
+              )}
+            </div>
+
+            <div className="px-6 py-3.5 border-t border-gray-150 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/[0.02]">
+              <span className="text-xs text-gray-500">Live preview generated using active CRM spreadsheet data</span>
+              <button
+                type="button"
+                onClick={() => setPreviewModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
