@@ -22,6 +22,7 @@ export interface Config {
   email_test_mode?: boolean;
   email_test_recipient?: string;
   email_prod_recipients?: string[];
+  email_bcc_recipients?: string[];
 }
 
 export interface GraphConfig {
