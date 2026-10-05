@@ -38,8 +38,13 @@ from app.services.email_components import (
 # Core SMTP Dispatch
 # ---------------------------------------------------------------------------
 
-def send_email(to_email: Union[str, List[str]], subject: str, html_content: str) -> bool:
-    """Send an HTML email via SMTP to one or multiple recipients."""
+def send_email(
+    to_email: Union[str, List[str]],
+    subject: str,
+    html_content: str,
+    bcc_emails: Optional[Union[str, List[str]]] = None
+) -> bool:
+    """Send an HTML email via SMTP to one or multiple recipients with optional BCC recipients."""
     if not settings.smtp_user or not settings.smtp_password:
         print("SMTP credentials not configured. Skipping dispatch.")
         return False
@@ -55,22 +60,36 @@ def send_email(to_email: Union[str, List[str]], subject: str, html_content: str)
         print("No valid recipients. Skipping dispatch.")
         return False
 
+    # Build envelope recipients for SMTP delivery (To + BCC)
+    envelope_recipients = list(recipients)
+    bcc_list: List[str] = []
+    if bcc_emails:
+        if isinstance(bcc_emails, list):
+            bcc_list = [e.strip() for e in bcc_emails if e and e.strip()]
+        else:
+            bcc_list = [bcc_emails.strip()] if bcc_emails and bcc_emails.strip() else []
+        for bcc_addr in bcc_list:
+            if bcc_addr not in envelope_recipients:
+                envelope_recipients.append(bcc_addr)
+
     clean_subject = subject.replace("&bull;", "·")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(clean_subject, "utf-8")
     msg["From"] = f"Cog Culture CRM <{settings.smtp_user}>"
     msg["To"] = to_header
+    # NOTE: msg["Bcc"] is intentionally omitted from the MIME headers so BCC recipients remain hidden
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     try:
         server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         server.starttls()
         server.login(settings.smtp_user, settings.smtp_password)
-        server.sendmail(settings.smtp_user, recipients, msg.as_string())
+        server.sendmail(settings.smtp_user, envelope_recipients, msg.as_string())
         server.quit()
         safe_sub = clean_subject.encode("ascii", "replace").decode("ascii")
-        print(f"Sent '{safe_sub}' to {to_header}")
+        bcc_info = f" (BCC: {', '.join(bcc_list)})" if bcc_list else ""
+        print(f"Sent '{safe_sub}' to {to_header}{bcc_info}")
         return True
     except Exception as e:
         safe_sub = clean_subject.encode("ascii", "replace").decode("ascii")
@@ -97,6 +116,16 @@ def get_email_recipients(override_recipient: Optional[str] = None) -> Tuple[List
     else:
         valid_prod = [r.strip() for r in prod_recipients if r and r.strip()]
         return valid_prod or ["kanishk@cogculture.agency"], False
+
+
+def get_bcc_recipients() -> List[str]:
+    """Returns the list of BCC email recipients for production digests."""
+    cfg = config_service.load_config()
+    bcc = cfg.get("email_bcc_recipients", [
+        "apoorv@cogculture.agency",
+        "kanishk@cogculture.agency",
+    ])
+    return [e.strip() for e in bcc if e and e.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -736,13 +765,15 @@ def build_proposals_followup_alert_html(
 
 def dispatch_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
+    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
     data = fetch_pipeline_digest_data()
     subject, html_content = build_daily_leads_digest_html(data, recipients, is_test_mode)
-    success = send_email(recipients, subject, html_content)
+    success = send_email(recipients, subject, html_content, bcc_emails=bcc_recipients)
     return {
         "success": success,
         "subject": subject,
         "recipients": recipients,
+        "bcc_recipients": bcc_recipients,
         "is_test_mode": is_test_mode,
         "hot_deals_count": len(data["hot_leads"]),
         "hot_pipeline_value": data["hot_pipeline_value"],
@@ -752,13 +783,15 @@ def dispatch_daily_leads_digest(override_recipient: Optional[str] = None) -> Dic
 
 def dispatch_proposals_followup_alert(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
+    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
     data = fetch_pipeline_digest_data()
     subject, html_content = build_proposals_followup_alert_html(data, recipients, is_test_mode)
-    success = send_email(recipients, subject, html_content)
+    success = send_email(recipients, subject, html_content, bcc_emails=bcc_recipients)
     return {
         "success": success,
         "subject": subject,
         "recipients": recipients,
+        "bcc_recipients": bcc_recipients,
         "is_test_mode": is_test_mode,
         "proposals_to_send_count": len(data["proposals_to_send"]),
         "unassigned_proposals_count": data["unassigned_proposals_count"],
@@ -770,12 +803,14 @@ def dispatch_proposals_followup_alert(override_recipient: Optional[str] = None) 
 
 def preview_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
+    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
     data = fetch_pipeline_digest_data()
     subject, html_content = build_daily_leads_digest_html(data, recipients, is_test_mode)
     return {
         "subject": subject,
         "html": html_content,
         "recipients": recipients,
+        "bcc_recipients": bcc_recipients,
         "is_test_mode": is_test_mode,
         "hot_deals_count": len(data["hot_leads"]),
         "hot_pipeline_value": data["hot_pipeline_value"],
@@ -785,12 +820,14 @@ def preview_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict
 
 def preview_proposals_followup_alert(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
+    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
     data = fetch_pipeline_digest_data()
     subject, html_content = build_proposals_followup_alert_html(data, recipients, is_test_mode)
     return {
         "subject": subject,
         "html": html_content,
         "recipients": recipients,
+        "bcc_recipients": bcc_recipients,
         "is_test_mode": is_test_mode,
         "proposals_to_send_count": len(data["proposals_to_send"]),
         "unassigned_proposals_count": data["unassigned_proposals_count"],
