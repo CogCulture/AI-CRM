@@ -388,8 +388,9 @@ def build_daily_leads_digest_html(
         f"{len(hot_leads)} active hot deals"
     )
     subject = (
-        f"[Cog CRM] Leads Digest · {today.strftime('%d %b')} · "
-        f"{len(display_leads)} new, {format_inr_compact(hot_val)} hot pipeline"
+        f"Leads Report · {today.strftime('%d %b %Y')} — "
+        f"{len(display_leads)} intake, {len(hot_leads)} hot deals, "
+        f"{format_inr_compact(hot_val)} pipeline"
     )
 
     # ── KPI Strip (2×2 grid) ──────────────────────────────────────────────
@@ -548,8 +549,9 @@ def build_proposals_followup_alert_html(
         f"{format_inr_compact(total_val_at_risk)} at risk"
     )
     subject = (
-        f"[Cog CRM] Action Alert · {today.strftime('%d %b')} · "
-        f"{len(followups_overdue_all)} overdue, {len(proposals_to_send)} to send"
+        f"Proposals & Follow-ups · {today.strftime('%d %b %Y')} — "
+        f"{len(proposals_to_send)} to send, {len(followups_overdue_all)} stale, "
+        f"{format_inr_compact(total_val_at_risk)} at risk"
     )
 
     # ── KPI Strip ─────────────────────────────────────────────────────────

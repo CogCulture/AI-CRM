@@ -27,38 +27,34 @@ from app.services.alert_service import check_and_send_alerts
 def health(): return {"status": "ok"}
 
 async def schedule_daily_tasks():
-    """Background task to dispatch daily lead digests and proposal follow-up alerts at 10:00 AM IST."""
-    # Let server boot fully first (wait 10 seconds)
-    await asyncio.sleep(10)
+    """Background task: fires daily digests exactly once at 10:00 AM IST."""
+    await asyncio.sleep(10)  # Let server boot fully
     print("Background daily scheduler started (polls every 60 seconds)...")
+
+    last_fired_date = None  # Guard: fire only once per calendar day
+
     while True:
         try:
-            from datetime import datetime, timedelta
-            # local time (UTC+5:30)
+            from datetime import datetime, timedelta, date as date_type
             local_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-            
-            # Daily 10:00 AM IST automation trigger
-            if local_now.hour == 10 and local_now.minute == 0:
-                print(f"Daily 10:00 AM IST scheduler trigger: processing daily digests and alerts...")
-                
-                # 1. Dispatch Daily Leads & New Intake Digest (Leads added yesterday, status, follow-up, source, hot leads)
+            today = local_now.date()
+
+            # Fire once at 10:00 AM IST — dedup by date so restarts are safe
+            if local_now.hour == 10 and local_now.minute == 0 and last_fired_date != today:
+                last_fired_date = today
+                print(f"[{local_now.strftime('%d %b %Y %H:%M IST')}] Firing daily email digests...")
+
                 from app.services.email_service import dispatch_daily_leads_digest, dispatch_proposals_followup_alert
-                dispatch_daily_leads_digest()
-                
-                # 2. Dispatch Daily Proposals & Follow-up Action Alert (Proposals today, Day 2/5/overdue cadence)
-                dispatch_proposals_followup_alert()
-                
-                # 3. Check deadlines
+                r1 = dispatch_daily_leads_digest()
+                r2 = dispatch_proposals_followup_alert()
+                print(f"  Leads digest sent: {r1.get('success')} → {r1.get('recipients')}")
+                print(f"  Proposals alert sent: {r2.get('success')} → {r2.get('recipients')}")
+
                 check_and_send_alerts()
 
-            # Optional 11:30 AM metrics snapshot
-            elif local_now.hour == 11 and local_now.minute == 30:
-                from app.services.report_service import send_daily_metrics_report
-                send_daily_metrics_report()
-
         except Exception as e:
-            print(f"Error in scheduled daily tasks: {e}")
-        # Poll every 60 seconds
+            print(f"[Scheduler error] {e}")
+
         await asyncio.sleep(60)
 
 @app.on_event("startup")
