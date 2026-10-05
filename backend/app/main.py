@@ -47,8 +47,10 @@ async def schedule_daily_tasks():
                 from app.services.email_service import dispatch_daily_leads_digest, dispatch_proposals_followup_alert
                 r1 = dispatch_daily_leads_digest()
                 r2 = dispatch_proposals_followup_alert()
-                print(f"  Leads digest sent: {r1.get('success')} → {r1.get('recipients')}")
-                print(f"  Proposals alert sent: {r2.get('success')} → {r2.get('recipients')}")
+                safe_s1 = (r1.get('subject') or '').encode('ascii', 'replace').decode('ascii')
+                safe_s2 = (r2.get('subject') or '').encode('ascii', 'replace').decode('ascii')
+                print(f"  Leads digest   -> sent={r1.get('success')} to={r1.get('recipients')} | {safe_s1}")
+                print(f"  Proposals alert-> sent={r2.get('success')} to={r2.get('recipients')} | {safe_s2}")
 
                 check_and_send_alerts()
 
