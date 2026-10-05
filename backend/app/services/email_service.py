@@ -1,9 +1,8 @@
 """
 Executive-grade email generation and dispatch service for Cog Culture CRM.
-Implements dynamic, minimalist boardroom reporting for Director & CMO.
+Minimalist boardroom reporting for Director & CMO — clean, scannable, professional.
 """
 
-import os
 import re
 import smtplib
 from datetime import datetime, timedelta
@@ -21,12 +20,18 @@ from app.services.email_components import (
     render_kpi_strip,
     render_executive_summary_box,
     render_section_title,
+    render_status_badge,
     render_chip,
     render_owner_tag,
+    render_lead_card,
     render_cta_button,
     render_footer,
     wrap_email_document,
-    FONT_STACK
+    FONT_STACK,
+    TEXT_MUTED,
+    TEXT_BODY,
+    TEXT_HEADING,
+    BORDER,
 )
 
 # ---------------------------------------------------------------------------
@@ -34,9 +39,9 @@ from app.services.email_components import (
 # ---------------------------------------------------------------------------
 
 def send_email(to_email: Union[str, List[str]], subject: str, html_content: str) -> bool:
-    """Send an HTML email using SMTP configuration in settings to single or multiple recipients."""
+    """Send an HTML email via SMTP to one or multiple recipients."""
     if not settings.smtp_user or not settings.smtp_password:
-        print("SMTP user or password not configured. Skipping email dispatch.")
+        print("SMTP credentials not configured. Skipping dispatch.")
         return False
 
     if isinstance(to_email, list):
@@ -47,17 +52,15 @@ def send_email(to_email: Union[str, List[str]], subject: str, html_content: str)
         to_header = to_email.strip() if to_email else ""
 
     if not recipients:
-        print("No valid recipients provided. Skipping email dispatch.")
+        print("No valid recipients. Skipping dispatch.")
         return False
 
-    # Ensure subject has no raw HTML entities
     clean_subject = subject.replace("&bull;", "·")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(clean_subject, "utf-8")
     msg["From"] = f"Cog Culture CRM <{settings.smtp_user}>"
     msg["To"] = to_header
-
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     try:
@@ -67,12 +70,13 @@ def send_email(to_email: Union[str, List[str]], subject: str, html_content: str)
         server.sendmail(settings.smtp_user, recipients, msg.as_string())
         server.quit()
         safe_sub = clean_subject.encode("ascii", "replace").decode("ascii")
-        print(f"Successfully sent email '{safe_sub}' to {to_header}")
+        print(f"Sent '{safe_sub}' to {to_header}")
         return True
     except Exception as e:
         safe_sub = clean_subject.encode("ascii", "replace").decode("ascii")
-        print(f"Failed to send email to {to_header}: {safe_sub} | error: {e}")
+        print(f"Failed to send to {to_header}: {e}")
         return False
+
 
 def get_email_recipients(override_recipient: Optional[str] = None) -> Tuple[List[str], bool]:
     """Returns (recipients_list, is_test_mode)."""
@@ -85,14 +89,15 @@ def get_email_recipients(override_recipient: Optional[str] = None) -> Tuple[List
     prod_recipients = cfg.get("email_prod_recipients", [
         "kanika@cogculture.agency",
         "vaibhav@cogculture.agency",
-        "daksh@cogculture.agency"
+        "daksh@cogculture.agency",
     ])
 
     if test_mode:
-        return [test_recipient if test_recipient else "kanishk@cogculture.agency"], True
+        return [test_recipient or "kanishk@cogculture.agency"], True
     else:
         valid_prod = [r.strip() for r in prod_recipients if r and r.strip()]
-        return valid_prod if valid_prod else ["kanishk@cogculture.agency"], False
+        return valid_prod or ["kanishk@cogculture.agency"], False
+
 
 # ---------------------------------------------------------------------------
 # Formatting & Parsing Helpers
@@ -124,8 +129,9 @@ def robust_parse_date(date_val: Any) -> Optional[datetime.date]:
             pass
     return None
 
+
 def parse_num(val: Any) -> float:
-    """Parse currency / numeric string safely."""
+    """Parse currency/numeric string safely."""
     if not val:
         return 0.0
     clean_val = str(val).split("(")[0].replace(",", "").replace("₹", "").replace("$", "").strip()
@@ -134,23 +140,24 @@ def parse_num(val: Any) -> float:
     except Exception:
         return 0.0
 
+
 def format_inr_compact(num: float) -> str:
-    """Format in boardroom Indian currency notation (₹1.68 Cr, ₹84.0L, ₹21.0L)."""
+    """Format in boardroom Indian currency notation (₹1.68 Cr, ₹84.0L)."""
     if not num or num <= 0:
-        return "Not set"
-    if num >= 10000000:
-        cr_val = num / 10000000.0
-        return f"₹{cr_val:.2f} Cr"
-    elif num >= 100000:
-        l_val = num / 100000.0
-        return f"₹{l_val:.1f}L"
+        return "—"
+    if num >= 10_000_000:
+        return f"₹{num / 10_000_000:.2f} Cr"
+    elif num >= 100_000:
+        return f"₹{num / 100_000:.1f}L"
     else:
         return f"₹{int(round(num)):,}"
 
+
 def is_test_record(company_name: str) -> bool:
-    """Flags test / placeholder lead rows that should be purged."""
+    """Flag test/placeholder records for exclusion."""
     clean = (company_name or "").strip().lower()
     return clean in ["ldmckjvc r", "test", "test lead", "placeholder", "demo", "sample"]
+
 
 # ---------------------------------------------------------------------------
 # Data Collection & Dynamic Pipeline Analytics
@@ -171,15 +178,22 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
                     r["_origin_tab"] = tab
                     all_rows.append(r)
             except Exception as e:
-                print(f"Error fetching tab {tab} for digest: {e}")
+                print(f"Error fetching tab {tab}: {e}")
 
     today = (datetime.utcnow() + timedelta(hours=5, minutes=30)).date()
     yesterday = today - timedelta(days=1)
 
-    # 1. Deduplicate & Clean Hot Leads
+    # ── 1. Deduplicate & Clean Hot Leads ──────────────────────────────────
     hot_leads_map: Dict[str, Dict[str, Any]] = {}
     audit_deduped_hot: List[str] = []
     audit_filtered_test: List[str] = []
+
+    def _val(r):
+        return parse_num(
+            r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)")
+            or r.get("Revenue Estimations")
+            or r.get("Value")
+        )
 
     for r in all_rows:
         company = (r.get("Company") or "").strip()
@@ -195,7 +209,7 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
 
         if st == "hot" and not any(x in stg for x in ["won", "lost", "dead", "dropped"]):
             comp_key = company.lower()
-            val = parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value"))
+            val = _val(r)
             poc = (r.get("Cog POC") or "").strip()
 
             if comp_key not in hot_leads_map:
@@ -203,17 +217,16 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
             else:
                 audit_deduped_hot.append(company)
                 existing = hot_leads_map[comp_key]
-                existing_val = parse_num(existing.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or existing.get("Revenue Estimations") or existing.get("Value"))
+                existing_val = _val(existing)
                 existing_poc = (existing.get("Cog POC") or "").strip()
-                # Pick row with value or POC
-                if (val > existing_val) or (not existing_poc and poc):
+                if val > existing_val or (not existing_poc and poc):
                     hot_leads_map[comp_key] = r
 
     hot_leads = list(hot_leads_map.values())
-    hot_leads.sort(key=lambda r: parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value")), reverse=True)
-    hot_pipeline_value = sum(parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value")) for r in hot_leads)
+    hot_leads.sort(key=_val, reverse=True)
+    hot_pipeline_value = sum(_val(r) for r in hot_leads)
 
-    # 2. Recent & New Intake Leads
+    # ── 2. Recent & New Intake Leads ──────────────────────────────────────
     leads_yesterday = []
     sorted_by_date = []
     for r in all_rows:
@@ -231,15 +244,15 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
     display_leads = leads_yesterday if leads_yesterday else recent_leads
     is_yesterday_intake = len(leads_yesterday) > 0
 
-    intake_valued_count = sum(1 for r in display_leads if parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value")) > 0)
-    intake_total_val = sum(parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value")) for r in display_leads)
+    intake_valued_count = sum(1 for r in display_leads if _val(r) > 0)
+    intake_total_val = sum(_val(r) for r in display_leads)
 
     intake_source_counts: Dict[str, int] = {}
     for r in display_leads:
         src = (r.get("Lead Source") or r.get("Source") or "Direct / Inbound").strip()
         intake_source_counts[src] = intake_source_counts.get(src, 0) + 1
 
-    # 3. Proposals to be sent today / queued
+    # ── 3. Proposals To Be Sent ───────────────────────────────────────────
     proposals_to_send_raw = []
     for r in all_rows:
         company = (r.get("Company") or "").strip()
@@ -247,7 +260,8 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
             continue
         st = str(r.get("Status", "")).strip().lower()
         stg = str(r.get("Stage", "")).strip().lower()
-        if any(x in st for x in ["won", "lost", "dead", "dropped"]) or any(x in stg for x in ["won", "lost", "dead", "dropped"]):
+        if any(x in st for x in ["won", "lost", "dead", "dropped"]) or \
+           any(x in stg for x in ["won", "lost", "dead", "dropped"]):
             continue
 
         if "proposal to be sent" in stg or "portfolio to be sent" in stg:
@@ -256,13 +270,18 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
 
     def proposal_sort_key(item):
         td = item.get("target_date")
-        if not td: return 9999
+        if not td:
+            return 9999
         return (td - today).days
 
     proposals_to_send_raw.sort(key=proposal_sort_key)
-    unassigned_proposals_count = sum(1 for p in proposals_to_send_raw if not (p["row"].get("Cog POC") or "").strip() or (p["row"].get("Cog POC") or "").strip().lower() in ["unassigned", "none", "—"])
+    unassigned_proposals_count = sum(
+        1 for p in proposals_to_send_raw
+        if not (p["row"].get("Cog POC") or "").strip()
+        or (p["row"].get("Cog POC") or "").strip().lower() in ["unassigned", "none", "—"]
+    )
 
-    # 4. Proposals Follow-ups (Cadence & Overdue)
+    # ── 4. Proposals Follow-ups (Cadence & Overdue) ───────────────────────
     followups_due = []
     followups_overdue_all = []
     deduped_followups_map: Dict[str, Dict[str, Any]] = {}
@@ -273,14 +292,15 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
             continue
         st = str(r.get("Status", "")).strip().lower()
         stg = str(r.get("Stage", "")).strip().lower()
-        if any(x in st for x in ["won", "lost", "dead", "dropped"]) or any(x in stg for x in ["won", "lost", "dead", "dropped"]):
+        if any(x in st for x in ["won", "lost", "dead", "dropped"]) or \
+           any(x in stg for x in ["won", "lost", "dead", "dropped"]):
             continue
 
         if "proposal sent" in stg or "portfolio sent" in stg:
             sent_d = robust_parse_date(r.get("Date")) or robust_parse_date(r.get("Follow up date"))
             if sent_d:
                 days_ago = (today - sent_d).days
-                val = parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value"))
+                val = _val(r)
                 entry = {"row": r, "sent_date": sent_d, "days_ago": days_ago, "value": val}
 
                 comp_key = company.lower()
@@ -294,9 +314,9 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
 
     followups_overdue_all.sort(key=lambda x: (x["value"], x["days_ago"]), reverse=True)
 
-    b_6_10 = [x for x in followups_overdue_all if 6 <= x["days_ago"] <= 10]
+    b_6_10  = [x for x in followups_overdue_all if 6  <= x["days_ago"] <= 10]
     b_11_20 = [x for x in followups_overdue_all if 11 <= x["days_ago"] <= 20]
-    b_21_plus = [x for x in followups_overdue_all if x["days_ago"] >= 21]
+    b_21p   = [x for x in followups_overdue_all if x["days_ago"] >= 21]
 
     total_val_at_risk = sum(item["value"] for item in deduped_followups_map.values())
 
@@ -316,157 +336,182 @@ def fetch_pipeline_digest_data() -> Dict[str, Any]:
         "followups_overdue_all": followups_overdue_all,
         "ageing_6_10": len(b_6_10),
         "ageing_11_20": len(b_11_20),
-        "ageing_21_plus": len(b_21_plus),
+        "ageing_21_plus": len(b_21p),
         "total_val_at_risk": total_val_at_risk,
         "audit_deduped_hot": audit_deduped_hot,
         "audit_filtered_test": audit_filtered_test,
     }
 
+
 # ---------------------------------------------------------------------------
-# Template 1: Daily Leads & New Intake Digest (Minimalist)
+# Helper: Build meta line for a lead row
 # ---------------------------------------------------------------------------
 
-def build_daily_leads_digest_html(data: Dict[str, Any], recipients: List[str], is_test_mode: bool) -> Tuple[str, str]:
+def _meta(parts: List[str]) -> str:
+    """Join non-empty parts with a middot separator."""
+    return " &middot; ".join(p for p in parts if p and p.strip())
+
+
+def _val_str(r: Dict[str, Any]) -> str:
+    v = parse_num(
+        r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)")
+        or r.get("Revenue Estimations")
+        or r.get("Value")
+    )
+    return format_inr_compact(v) if v > 0 else ""
+
+
+# ---------------------------------------------------------------------------
+# Template 1: Daily Leads & New Intake Digest
+# ---------------------------------------------------------------------------
+
+def build_daily_leads_digest_html(
+    data: Dict[str, Any],
+    recipients: List[str],
+    is_test_mode: bool
+) -> Tuple[str, str]:
     today = data["today"]
     today_str = today.strftime("%d %b %Y")
     recipients_str = ", ".join(recipients)
 
-    hot_leads = data["hot_leads"]
-    hot_val = data["hot_pipeline_value"]
+    hot_leads    = data["hot_leads"]
+    hot_val      = data["hot_pipeline_value"]
     display_leads = data["display_leads"]
-    is_yesterday = data["is_yesterday_intake"]
-    intake_val = data["intake_total_val"]
-    intake_valued_count = data["intake_valued_count"]
+    is_yesterday  = data["is_yesterday_intake"]
+    intake_val    = data["intake_total_val"]
+    intake_valued = data["intake_valued_count"]
     source_counts = data["intake_source_counts"]
 
-    preheader = f"{len(display_leads)} new leads · {format_inr_compact(hot_val)} hot pipeline · {len(hot_leads)} active hot deals"
-    subject = f"[Cog CRM] Leads Digest · {today.strftime('%d %b')} · {len(display_leads)} new, {format_inr_compact(hot_val)} hot pipeline"
+    preheader = (
+        f"{len(display_leads)} new leads · "
+        f"{format_inr_compact(hot_val)} hot pipeline · "
+        f"{len(hot_leads)} active hot deals"
+    )
+    subject = (
+        f"[Cog CRM] Leads Digest · {today.strftime('%d %b')} · "
+        f"{len(display_leads)} new, {format_inr_compact(hot_val)} hot pipeline"
+    )
 
-    # KPI Strip
-    intake_label = "New Leads Intake" if is_yesterday else "Recent Intake"
-    intake_subtext = "Added yesterday" if is_yesterday else "Past 7 days · Top 6"
-    intake_val_subtext = f"{intake_valued_count} of {len(display_leads)} leads with value" if intake_valued_count > 0 else "No values entered"
+    # ── KPI Strip (2×2 grid) ──────────────────────────────────────────────
+    intake_label   = "New Leads" if is_yesterday else "Recent Leads"
+    intake_subtext = "Added yesterday" if is_yesterday else "Top 6 recent"
+    intake_val_sub = (
+        f"₹ value from {intake_valued} of {len(display_leads)}"
+        if intake_valued > 0 else "No values entered yet"
+    )
 
     kpis = [
-        {"label": intake_label, "value": f"{len(display_leads)} Leads", "subtext": intake_subtext, "value_color": "#0f172a"},
-        {"label": "Active Hot Deals", "value": f"{len(hot_leads)} Deals", "subtext": "High intent pipeline", "value_color": "#dc2626"},
-        {"label": "Hot Pipeline Value", "value": format_inr_compact(hot_val), "subtext": f"{len(hot_leads)} qualified deals", "value_color": "#0f172a"},
-        {"label": "Intake Value", "value": format_inr_compact(intake_val) if intake_val > 0 else "—", "subtext": intake_val_subtext, "value_color": "#0f172a"},
+        {"label": intake_label,      "value": f"{len(display_leads)}",             "subtext": intake_subtext,           "value_color": "#111827"},
+        {"label": "Active Hot Deals", "value": f"{len(hot_leads)}",                "subtext": "High-intent pipeline",   "value_color": "#dc2626"},
+        {"label": "Hot Pipeline",    "value": format_inr_compact(hot_val),          "subtext": f"{len(hot_leads)} deals", "value_color": "#111827"},
+        {"label": "Intake Value",    "value": format_inr_compact(intake_val) if intake_val > 0 else "—",
+                                     "subtext": intake_val_sub,                     "value_color": "#111827"},
     ]
 
-    # Executive Summary: 3 dynamic highlights with status dots
-    top_hot_deal = hot_leads[0] if hot_leads else None
-    top_hot_comp = top_hot_deal.get("Company", "") if top_hot_deal else ""
-    top_hot_val_str = format_inr_compact(parse_num(top_hot_deal.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or top_hot_deal.get("Revenue Estimations") or top_hot_deal.get("Value"))) if top_hot_deal else ""
-    top_hot_owner = (top_hot_deal.get("Cog POC") or "Unassigned").strip() if top_hot_deal else ""
-    top_hot_note = (top_hot_deal.get("Remarks /Updates") or top_hot_deal.get("Last Update") or "").strip() if top_hot_deal else ""
+    # ── Executive Summary ─────────────────────────────────────────────────
+    top_deal   = hot_leads[0] if hot_leads else None
+    sec_deal   = hot_leads[1] if len(hot_leads) > 1 else None
+    src_summary = ", ".join(f"{src} ({cnt})" for src, cnt in source_counts.items())
 
-    second_hot = hot_leads[1] if len(hot_leads) > 1 else None
-    second_hot_comp = second_hot.get("Company", "") if second_hot else ""
-    second_hot_val_str = format_inr_compact(parse_num(second_hot.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or second_hot.get("Revenue Estimations") or second_hot.get("Value"))) if second_hot else ""
-    second_hot_owner = (second_hot.get("Cog POC") or "Unassigned").strip() if second_hot else ""
-    second_hot_note = (second_hot.get("Remarks /Updates") or second_hot.get("Last Update") or "").strip() if second_hot else ""
-
-    source_summary = ", ".join([f"{src} ({cnt})" for src, cnt in source_counts.items()])
-
-    summary_items = [
-        {
+    summary_items = []
+    if top_deal:
+        comp = top_deal.get("Company", "")
+        val  = _val_str(top_deal)
+        poc  = (top_deal.get("Cog POC") or "Unassigned").strip()
+        note = (top_deal.get("Remarks /Updates") or top_deal.get("Last Update") or "Active in hot pipeline.").strip()[:100]
+        val_part = f" ({val})" if val else ""
+        summary_items.append({
             "color": "#dc2626",
-            "lead": f"{top_hot_comp} ({top_hot_val_str}) · Owner: {top_hot_owner}:",
-            "text": f'"{top_hot_note}"' if top_hot_note else "Top deal in hot pipeline."
-        },
-        {
+            "lead": f"{comp}{val_part} · {poc}:",
+            "text": note,
+        })
+
+    if sec_deal:
+        comp = sec_deal.get("Company", "")
+        val  = _val_str(sec_deal)
+        poc  = (sec_deal.get("Cog POC") or "Unassigned").strip()
+        note = (sec_deal.get("Remarks /Updates") or sec_deal.get("Last Update") or "Active in hot pipeline.").strip()[:100]
+        val_part = f" ({val})" if val else ""
+        summary_items.append({
             "color": "#d97706",
-            "lead": f"{second_hot_comp} ({second_hot_val_str}) · Owner: {second_hot_owner}:",
-            "text": f'"{second_hot_note}"' if second_hot_note else "Active in hot pipeline."
-        },
-        {
-            "color": "#2563eb",
-            "lead": f"{len(display_leads)} Recent Leads Intake:",
-            "text": f"Source distribution: {source_summary}."
-        }
-    ]
+            "lead": f"{comp}{val_part} · {poc}:",
+            "text": note,
+        })
 
-    # Section 1: Active Hot Deals (Minimalist 2-row List Format - Never Overflows)
-    hot_leads_items = ""
+    summary_items.append({
+        "color": "#2563eb",
+        "lead": f"{len(display_leads)} leads {'added yesterday' if is_yesterday else 'in recent intake'}:",
+        "text": f"Source — {src_summary}." if src_summary else "No source data available.",
+    })
+
+    # ── Section 1: Hot Pipeline ───────────────────────────────────────────
+    hot_cards = ""
     for idx, r in enumerate(hot_leads, 1):
-        comp = (r.get("Company") or "Lead").strip()
-        poc = (r.get("Cog POC") or "").strip()
-        req = (r.get("Requirement") or "").strip()
-        note = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
-        v = parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value"))
-        v_str = format_inr_compact(v)
+        comp  = (r.get("Company") or "Lead").strip()
+        poc   = (r.get("Cog POC") or "").strip()
+        req   = (r.get("Requirement") or "").strip()
+        note  = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
+        v_str = _val_str(r)
+        meta  = _meta([
+            f'<span style="color:{TEXT_MUTED}; font-weight:500;">{poc}</span>' if poc else
+            f'<span style="color:#d97706; font-weight:500;">No owner</span>',
+            req[:60] + ("…" if len(req) > 60 else "") if req else "",
+        ])
+        hot_cards += render_lead_card(
+            index=idx,
+            company=comp,
+            value_str=v_str,
+            meta_line=meta,
+            note=note,
+            border_left_color="#dc2626" if idx == 1 else "",
+        )
 
-        hot_leads_items += f"""
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom: 1px solid #f1f5f9; padding: 8px 0; table-layout: fixed;">
-            <tr>
-                <td valign="top" style="font-family:{FONT_STACK};">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">{idx}. {comp}</span>
-                </td>
-                <td align="right" valign="top" style="font-family:{FONT_STACK}; font-size:13px; font-weight:800; color:#dc2626; white-space:nowrap; padding-left:8px;">
-                    {v_str}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="font-family:{FONT_STACK}; font-size:11px; color:#475569; padding-top:2px; line-height:1.4;">
-                    {render_owner_tag(poc)} {f'&middot; {req}' if req else ''} {f'&middot; <span style="color:#64748b;">{note}</span>' if note else ''}
-                </td>
-            </tr>
-        </table>
-        """
-
-    # Section 2: Recent Intake Leads (Minimalist 2-row List Format)
-    new_leads_items = ""
+    # ── Section 2: Intake / New Leads ────────────────────────────────────
+    new_cards = ""
     for idx, r in enumerate(display_leads, 1):
-        comp = (r.get("Company") or "Lead").strip()
+        comp  = (r.get("Company") or "Lead").strip()
         stage = (r.get("Stage") or "Discovery").strip()
-        src = (r.get("Lead Source") or r.get("Source") or "Direct").strip()
-        poc = (r.get("Cog POC") or "").strip()
-        req = (r.get("Requirement") or "").strip()
-        note = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
-        v = parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value"))
-        v_str = format_inr_compact(v)
+        src   = (r.get("Lead Source") or r.get("Source") or "Direct").strip()
+        poc   = (r.get("Cog POC") or "").strip()
+        req   = (r.get("Requirement") or "").strip()
+        note  = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
+        v     = parse_num(
+            r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)")
+            or r.get("Revenue Estimations")
+            or r.get("Value")
+        )
+        v_str = format_inr_compact(v) if v > 0 else ""
+        badge = render_status_badge(stage, "neutral") if not v_str else ""
 
-        c_phone = r.get("Contact No.") or r.get("Phone") or ""
-        c_email = r.get("Email Id") or r.get("Email") or ""
-        contact_links = []
-        if c_phone: contact_links.append(f'<a href="tel:{c_phone}" style="color:#2563eb;font-weight:600;">Call</a>')
-        if c_email: contact_links.append(f'<a href="mailto:{c_email}" style="color:#2563eb;font-weight:600;">Email</a>')
-        contact_html = f"&middot; {' / '.join(contact_links)}" if contact_links else ""
-
-        new_leads_items += f"""
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom: 1px solid #f1f5f9; padding: 8px 0; table-layout: fixed;">
-            <tr>
-                <td valign="top" style="font-family:{FONT_STACK};">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">{idx}. {comp}</span>
-                    <span style="font-size:11px; color:#64748b; margin-left:6px;">{src}</span>
-                </td>
-                <td align="right" valign="top" style="font-family:{FONT_STACK}; white-space:nowrap; padding-left:8px;">
-                    {f'<span style="font-size:13px; font-weight:700; color:#0f172a;">{v_str}</span>' if v > 0 else render_chip(stage, 'scheduled')}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="font-family:{FONT_STACK}; font-size:11px; color:#475569; padding-top:2px; line-height:1.4;">
-                    {render_owner_tag(poc)} {f'&middot; {req}' if req else ''} {contact_html} {f'&middot; <span style="color:#64748b;">{note}</span>' if note else ''}
-                </td>
-            </tr>
-        </table>
-        """
+        meta = _meta([
+            f'<span style="color:{TEXT_MUTED}; font-weight:500;">{poc}</span>' if poc else
+            f'<span style="color:#d97706; font-weight:500;">No owner</span>',
+            f'via {src}' if src else "",
+            req[:60] + ("…" if len(req) > 60 else "") if req else "",
+        ])
+        new_cards += render_lead_card(
+            index=idx,
+            company=comp,
+            value_str=v_str,
+            badge_html=badge,
+            meta_line=meta,
+            note=note,
+        )
 
     body = f"""
     {render_test_mode_banner(recipients_str) if is_test_mode else ''}
-    {render_header("Leads & Intake Digest", today_str)}
+    {render_header("Leads &amp; Intake Digest", today_str)}
     {render_kpi_strip(kpis)}
-    {render_executive_summary_box("Executive Summary · Needs Attention Today", summary_items)}
+    {render_executive_summary_box("Executive Summary", summary_items)}
 
-    {render_section_title("Active Hot Pipeline", f"{len(hot_leads)} Deals · {format_inr_compact(hot_val)} Total")}
-    <div style="margin-bottom: 20px;">
-        {hot_leads_items}
+    {render_section_title("Active Hot Pipeline", f"{len(hot_leads)} deals · {format_inr_compact(hot_val)} total")}
+    <div style="margin-bottom:28px;">
+        {hot_cards}
     </div>
 
-    {render_section_title(intake_label, f"{len(display_leads)} Deals · {intake_subtext}")}
-    <div style="margin-bottom: 18px;">
-        {new_leads_items}
+    {render_section_title(intake_label, f"{len(display_leads)} deals · {intake_subtext}")}
+    <div style="margin-bottom:20px;">
+        {new_cards}
     </div>
 
     {render_cta_button("Open CRM Dashboard", "https://crm.cogculture.agency/dashboard")}
@@ -476,159 +521,203 @@ def build_daily_leads_digest_html(data: Dict[str, Any], recipients: List[str], i
     html = wrap_email_document(subject, preheader, body)
     return subject, html
 
+
 # ---------------------------------------------------------------------------
-# Template 2: Daily Proposals & Follow-up Action Alert (Minimalist)
+# Template 2: Daily Proposals & Follow-up Action Alert
 # ---------------------------------------------------------------------------
 
-def build_proposals_followup_alert_html(data: Dict[str, Any], recipients: List[str], is_test_mode: bool) -> Tuple[str, str]:
+def build_proposals_followup_alert_html(
+    data: Dict[str, Any],
+    recipients: List[str],
+    is_test_mode: bool
+) -> Tuple[str, str]:
     today = data["today"]
     today_str = today.strftime("%d %b %Y")
     recipients_str = ", ".join(recipients)
 
-    proposals_to_send = data["proposals_to_send"]
-    unassigned_count = data["unassigned_proposals_count"]
-    followups_due = data["followups_due"]
+    proposals_to_send     = data["proposals_to_send"]
+    unassigned_count      = data["unassigned_proposals_count"]
+    followups_due         = data["followups_due"]
     followups_overdue_all = data["followups_overdue_all"]
-    total_val_at_risk = data["total_val_at_risk"]
+    total_val_at_risk     = data["total_val_at_risk"]
 
-    preheader = f"{len(proposals_to_send)} proposals queued · {len(followups_due)} due · {len(followups_overdue_all)} overdue · {format_inr_compact(total_val_at_risk)} value at risk"
-    subject = f"[Cog CRM] Action Alert · {today.strftime('%d %b')} · {len(followups_overdue_all)} overdue follow-ups, {len(proposals_to_send)} to send"
+    preheader = (
+        f"{len(proposals_to_send)} proposals queued · "
+        f"{len(followups_due)} follow-ups due · "
+        f"{len(followups_overdue_all)} overdue · "
+        f"{format_inr_compact(total_val_at_risk)} at risk"
+    )
+    subject = (
+        f"[Cog CRM] Action Alert · {today.strftime('%d %b')} · "
+        f"{len(followups_overdue_all)} overdue, {len(proposals_to_send)} to send"
+    )
 
-    # KPI Strip
+    # ── KPI Strip ─────────────────────────────────────────────────────────
     kpis = [
-        {"label": "Proposals To Send", "value": f"{len(proposals_to_send)} Deals", "subtext": f"{unassigned_count} unassigned", "value_color": "#d97706" if unassigned_count > 0 else "#0f172a"},
-        {"label": "Follow-ups Due", "value": f"{len(followups_due)} Deals", "subtext": "Day 2 & Day 5 cadence", "value_color": "#059669"},
-        {"label": "Overdue Reminders", "value": f"{len(followups_overdue_all)} Deals", "subtext": "Day 6+ stale cadence", "value_color": "#dc2626"},
-        {"label": "Value at Risk", "value": format_inr_compact(total_val_at_risk), "subtext": "Sum on due & overdue", "value_color": "#0f172a"},
+        {
+            "label": "Proposals to Send",
+            "value": str(len(proposals_to_send)),
+            "subtext": f"{unassigned_count} without an owner",
+            "value_color": "#d97706" if unassigned_count > 0 else "#111827",
+        },
+        {
+            "label": "Follow-ups Due",
+            "value": str(len(followups_due)),
+            "subtext": "Day 2 & Day 5 cadence",
+            "value_color": "#059669",
+        },
+        {
+            "label": "Overdue Reminders",
+            "value": str(len(followups_overdue_all)),
+            "subtext": "Day 6+ stale",
+            "value_color": "#dc2626",
+        },
+        {
+            "label": "Value at Risk",
+            "value": format_inr_compact(total_val_at_risk),
+            "subtext": "Across overdue pipeline",
+            "value_color": "#111827",
+        },
     ]
 
-    # Executive Summary: 3 dynamic bottleneck bullets
-    summary_items = [
-        {
+    # ── Executive Summary ─────────────────────────────────────────────────
+    summary_items = []
+    if unassigned_count > 0:
+        summary_items.append({
             "color": "#d97706",
-            "lead": f"{unassigned_count} of {len(proposals_to_send)} proposals to send have no owner:",
-            "text": "Requires immediate leadership assignment before delivery."
-        }
-    ]
+            "lead": f"{unassigned_count} of {len(proposals_to_send)} proposals have no owner assigned.",
+            "text": "Leadership action required before these can be sent.",
+        })
 
     if followups_overdue_all:
-        top_overdue = followups_overdue_all[0]
-        top_overdue_comp = top_overdue["row"].get("Company", "Lead")
-        top_overdue_val_str = format_inr_compact(top_overdue["value"])
-        top_overdue_days = top_overdue["days_ago"]
-        top_overdue_poc = (top_overdue["row"].get("Cog POC") or "Unassigned").strip()
-        top_overdue_note = (top_overdue["row"].get("Remarks /Updates") or top_overdue["row"].get("Last Update") or "").strip()
+        top = followups_overdue_all[0]
+        comp = top["row"].get("Company", "Lead")
+        val_str = format_inr_compact(top["value"])
+        days    = top["days_ago"]
+        poc     = (top["row"].get("Cog POC") or "Unassigned").strip()
         summary_items.append({
             "color": "#dc2626",
-            "lead": f"{top_overdue_comp} ({top_overdue_val_str}) · {top_overdue_days}d overdue · {top_overdue_poc}:",
-            "text": f'"{top_overdue_note}"' if top_overdue_note else "Oldest high-value proposal pending client response."
+            "lead": f"{comp} ({val_str}) · {days}d overdue · {poc}:",
+            "text": "Oldest high-value deal pending follow-up.",
         })
 
     summary_items.append({
         "color": "#2563eb",
-        "lead": f"Pipeline Ageing Overview ({len(followups_overdue_all)} Overdue Deals):",
-        "text": f"6–10 days: {data['ageing_6_10']} deals · 11–20 days: {data['ageing_11_20']} deals · 21+ days: {data['ageing_21_plus']} stale deals."
+        "lead": f"Ageing overview ({len(followups_overdue_all)} overdue deals):",
+        "text": (
+            f"6–10 days: {data['ageing_6_10']} · "
+            f"11–20 days: {data['ageing_11_20']} · "
+            f"21+ days: {data['ageing_21_plus']} stale."
+        ),
     })
 
-    # Part 1: Proposals To Be Sent List (Minimalist 2-row layout)
-    to_send_items = ""
+    # ── Part 1: Proposals to Send ─────────────────────────────────────────
+    to_send_cards = ""
     for idx, item in enumerate(proposals_to_send, 1):
-        r = item["row"]
-        td = item.get("target_date")
+        r    = item["row"]
+        td   = item.get("target_date")
         comp = (r.get("Company") or "Deal").strip()
-        poc = (r.get("Cog POC") or "").strip()
-        req = (r.get("Requirement") or "Proposal").strip()
-        notes = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
-        v = parse_num(r.get("Revenue Estimation (In INR) (Oct 26 - Mar 27)") or r.get("Revenue Estimations") or r.get("Value"))
-        v_str = format_inr_compact(v)
+        poc  = (r.get("Cog POC") or "").strip()
+        req  = (r.get("Requirement") or "Proposal").strip()
+        note = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
+        v_str = _val_str(r)
 
         if not td:
-            chip_html = render_chip("Scheduled", "scheduled")
+            badge = render_status_badge("Scheduled", "scheduled")
         else:
-            diff_days = (today - td).days
-            if diff_days > 0:
-                chip_html = render_chip(f"Overdue ({diff_days}d late)", "overdue")
-            elif diff_days == 0:
-                chip_html = render_chip("Due Today", "due_today")
+            diff = (today - td).days
+            if diff > 0:
+                badge = render_status_badge(f"Overdue · {diff}d", "overdue")
+            elif diff == 0:
+                badge = render_status_badge("Due Today", "due_today")
             else:
-                chip_html = render_chip("Scheduled", "scheduled")
+                badge = render_status_badge("Scheduled", "scheduled")
 
-        to_send_items += f"""
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom: 1px solid #f1f5f9; padding: 8px 0; table-layout: fixed;">
-            <tr>
-                <td valign="top" style="font-family:{FONT_STACK};">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">{idx}. {comp}</span>
-                    {f'<span style="font-size:12px; font-weight:700; color:#0f172a; margin-left:6px;">({v_str})</span>' if v > 0 else ''}
-                </td>
-                <td align="right" valign="top" style="font-family:{FONT_STACK}; white-space:nowrap; padding-left:8px;">
-                    {chip_html}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="font-family:{FONT_STACK}; font-size:11px; color:#475569; padding-top:2px; line-height:1.4;">
-                    {render_owner_tag(poc)} {f'&middot; {req}' if req else ''} {f'&middot; <span style="color:#64748b;">{notes}</span>' if notes else ''}
-                </td>
-            </tr>
-        </table>
-        """
+        meta = _meta([
+            f'<span style="color:{TEXT_MUTED}; font-weight:500;">{poc}</span>' if poc else
+            f'<span style="color:#d97706; font-weight:500;">No owner</span>',
+            req[:60] + ("…" if len(req) > 60 else "") if req else "",
+        ])
 
-    # Part 2: Top Overdue Follow-ups (Top 10)
+        to_send_cards += render_lead_card(
+            index=idx,
+            company=comp,
+            value_str=v_str,
+            badge_html=badge if not v_str else "",
+            meta_line=meta,
+            note=note,
+        )
+
+    # ── Part 2: Top 10 Overdue Follow-ups ────────────────────────────────
     top_overdue_list = followups_overdue_all[:10]
-    overdue_items = ""
+    overdue_cards = ""
     for idx, item in enumerate(top_overdue_list, 1):
-        r = item["row"]
-        comp = (r.get("Company") or "Deal").strip()
-        poc = (r.get("Cog POC") or "").strip()
-        req = (r.get("Requirement") or "").strip()
-        notes = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
+        r        = item["row"]
+        comp     = (r.get("Company") or "Deal").strip()
+        poc      = (r.get("Cog POC") or "").strip()
+        req      = (r.get("Requirement") or "").strip()
+        note     = (r.get("Remarks /Updates") or r.get("Last Update") or "").strip()
         days_ago = item.get("days_ago", 0)
-        v = item.get("value", 0.0)
-        v_str = format_inr_compact(v)
+        v_str    = format_inr_compact(item.get("value", 0))
 
         c_phone = r.get("Contact No.") or r.get("Phone") or ""
         c_email = r.get("Email Id") or r.get("Email") or ""
-        contact_links = []
-        if c_phone: contact_links.append(f'<a href="tel:{c_phone}" style="color:#2563eb;font-weight:700;">Call</a>')
-        if c_email: contact_links.append(f'<a href="mailto:{c_email}" style="color:#2563eb;font-weight:700;">Email</a>')
-        contact_html = f"&middot; {' / '.join(contact_links)}" if contact_links else ""
+        contact_parts = []
+        if c_phone:
+            contact_parts.append(f'<a href="tel:{c_phone}" style="color:#2563eb; font-weight:600;">Call</a>')
+        if c_email:
+            contact_parts.append(f'<a href="mailto:{c_email}" style="color:#2563eb; font-weight:600;">Email</a>')
 
-        overdue_items += f"""
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom: 1px solid #f1f5f9; padding: 8px 0; table-layout: fixed;">
-            <tr>
-                <td valign="top" style="font-family:{FONT_STACK};">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">{idx}. {comp}</span>
-                    {f'<span style="font-size:12px; font-weight:700; color:#0f172a; margin-left:6px;">({v_str})</span>' if v > 0 else ''}
-                </td>
-                <td align="right" valign="top" style="font-family:{FONT_STACK}; white-space:nowrap; padding-left:8px;">
-                    {render_chip(f"{days_ago}d overdue", "overdue")}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="font-family:{FONT_STACK}; font-size:11px; color:#475569; padding-top:2px; line-height:1.4;">
-                    {render_owner_tag(poc)} {f'&middot; {req}' if req else ''} {contact_html} {f'&middot; <span style="color:#64748b;">{notes}</span>' if notes else ''}
-                </td>
-            </tr>
-        </table>
-        """
+        # Days badge color
+        if days_ago >= 21:
+            badge = render_status_badge(f"{days_ago}d overdue", "overdue")
+        elif days_ago >= 11:
+            badge = render_status_badge(f"{days_ago}d overdue", "due_today")
+        else:
+            badge = render_status_badge(f"{days_ago}d overdue", "warm")
+
+        meta_parts = [
+            f'<span style="color:{TEXT_MUTED}; font-weight:500;">{poc}</span>' if poc else
+            f'<span style="color:#d97706; font-weight:500;">No owner</span>',
+            req[:60] + ("…" if len(req) > 60 else "") if req else "",
+        ]
+        if contact_parts:
+            meta_parts.append(" / ".join(contact_parts))
+        meta = _meta(meta_parts)
+
+        overdue_cards += render_lead_card(
+            index=idx,
+            company=comp,
+            value_str=v_str,
+            badge_html=badge,
+            meta_line=meta,
+            note=note,
+        )
+
+    view_all_link = (
+        f'<a href="https://crm.cogculture.agency/dashboard?tab=follow_ups" '
+        f'target="_blank" style="color:#2563eb; font-weight:600; text-decoration:none;">'
+        f'View all {len(followups_overdue_all)} overdue deals &rarr;</a>'
+    )
 
     body = f"""
     {render_test_mode_banner(recipients_str) if is_test_mode else ''}
-    {render_header("Proposals & Follow-up Action Alert", today_str)}
+    {render_header("Proposals &amp; Follow-up Alert", today_str)}
     {render_kpi_strip(kpis)}
-    {render_executive_summary_box("Executive Summary · Bottleneck Watch", summary_items)}
+    {render_executive_summary_box("Bottleneck Watch", summary_items)}
 
-    {render_section_title("Part 1: Proposals To Be Sent", f"{len(proposals_to_send)} Deals · {unassigned_count} Unassigned")}
-    <div style="margin-bottom: 20px;">
-        {to_send_items}
+    {render_section_title("Proposals to Send", f"{len(proposals_to_send)} queued · {unassigned_count} unassigned")}
+    <div style="margin-bottom:28px;">
+        {to_send_cards}
     </div>
 
-    {render_section_title("Part 2: Overdue Follow-ups", f"Top 10 of {len(followups_overdue_all)} · {format_inr_compact(total_val_at_risk)} at Risk")}
-    <div style="margin-bottom: 16px;">
-        {overdue_items}
+    {render_section_title("Overdue Follow-ups", f"Top 10 of {len(followups_overdue_all)} · {format_inr_compact(total_val_at_risk)} at risk")}
+    <div style="margin-bottom:16px;">
+        {overdue_cards}
     </div>
 
-    <div style="text-align: center; font-family: {FONT_STACK}; font-size: 11px; color: #64748b; margin-bottom: 20px;">
-        Showing top 10 overdue deals &bull; <a href="https://crm.cogculture.agency/dashboard?tab=follow_ups" target="_blank" style="color: #2563eb; font-weight: 600;">View all {len(followups_overdue_all)} overdue deals in CRM &rarr;</a>
+    <div style="text-align:center; font-family:{FONT_STACK}; font-size:11px; color:{TEXT_MUTED}; margin-bottom:20px; line-height:1.6;">
+        Showing top 10 &nbsp;&middot;&nbsp; {view_all_link}
     </div>
 
     {render_cta_button("Open Proposal Tracker", "https://crm.cogculture.agency/dashboard?tab=proposals")}
@@ -637,6 +726,7 @@ def build_proposals_followup_alert_html(data: Dict[str, Any], recipients: List[s
 
     html = wrap_email_document(subject, preheader, body)
     return subject, html
+
 
 # ---------------------------------------------------------------------------
 # Dispatch & Preview Operations
@@ -654,8 +744,9 @@ def dispatch_daily_leads_digest(override_recipient: Optional[str] = None) -> Dic
         "is_test_mode": is_test_mode,
         "hot_deals_count": len(data["hot_leads"]),
         "hot_pipeline_value": data["hot_pipeline_value"],
-        "displayed_leads_count": len(data["display_leads"])
+        "displayed_leads_count": len(data["display_leads"]),
     }
+
 
 def dispatch_proposals_followup_alert(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
@@ -671,8 +762,9 @@ def dispatch_proposals_followup_alert(override_recipient: Optional[str] = None) 
         "unassigned_proposals_count": data["unassigned_proposals_count"],
         "followups_due_count": len(data["followups_due"]),
         "followups_overdue_count": len(data["followups_overdue_all"]),
-        "total_val_at_risk": data["total_val_at_risk"]
+        "total_val_at_risk": data["total_val_at_risk"],
     }
+
 
 def preview_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
@@ -685,8 +777,9 @@ def preview_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict
         "is_test_mode": is_test_mode,
         "hot_deals_count": len(data["hot_leads"]),
         "hot_pipeline_value": data["hot_pipeline_value"],
-        "displayed_leads_count": len(data["display_leads"])
+        "displayed_leads_count": len(data["display_leads"]),
     }
+
 
 def preview_proposals_followup_alert(override_recipient: Optional[str] = None) -> Dict[str, Any]:
     recipients, is_test_mode = get_email_recipients(override_recipient)
@@ -700,15 +793,17 @@ def preview_proposals_followup_alert(override_recipient: Optional[str] = None) -
         "proposals_to_send_count": len(data["proposals_to_send"]),
         "unassigned_proposals_count": data["unassigned_proposals_count"],
         "followups_overdue_count": len(data["followups_overdue_all"]),
-        "total_val_at_risk": data["total_val_at_risk"]
+        "total_val_at_risk": data["total_val_at_risk"],
     }
 
+
 def send_deadline_reminder(to_email: str, poc_name: str, company: str, deadline: str, stage: str) -> bool:
-    subject = f"Urgent Action Required: Deadline Approaching for {company}"
+    subject = f"Deadline Approaching: {company}"
     html = f"<p>Hi {poc_name}, deadline approaching for {company}: {deadline}</p>"
     return send_email(to_email, subject, html)
 
+
 def send_followup_reminder(to_email: str, poc_name: str, company: str, followup_date: str, stage: str) -> bool:
-    subject = f"Action Required: Follow-up Scheduled for {company}"
+    subject = f"Follow-up Scheduled: {company}"
     html = f"<p>Hi {poc_name}, follow-up scheduled for {company} on {followup_date}</p>"
     return send_email(to_email, subject, html)
