@@ -73,7 +73,7 @@ function LoginContent() {
     setErrorMsg(null);
     const redirectUrl = `${window.location.origin}/dashboard`;
     const backendUrl = "";
-    window.location.href = `${backendUrl}/api/sheets/auth?redirect_url=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `${backendUrl}/api/sheets/auth?redirect_url=${encodeURIComponent(redirectUrl)}&mode=login`;
   };
 
   if (checking) {

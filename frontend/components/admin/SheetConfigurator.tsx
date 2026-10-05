@@ -341,7 +341,7 @@ export default function SheetConfigurator() {
 
   const handleGoogleSignIn = () => {
     const redirectUrl = `${window.location.origin}/admin`;
-    window.location.href = `/api/sheets/auth?redirect_url=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `/api/sheets/auth?redirect_url=${encodeURIComponent(redirectUrl)}&mode=sheets`;
   };
 
   const handleSignOut = async () => {

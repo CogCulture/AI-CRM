@@ -5,6 +5,7 @@ from app.services import config_service, sheets_service, db_service
 from app.config import settings
 from google_auth_oauthlib.flow import Flow
 import os
+import re
 import urllib.parse
 
 # Relax oauthlib's strict scope check since Google adds openid/profile/email automatically
@@ -34,12 +35,34 @@ def get_sheet_data(bypass_cache: bool = False, sheet_range: Optional[str] = None
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/auth")
-def oauth_auth(redirect_url: str = "http://localhost:3001/admin"):
+def oauth_auth(redirect_url: str = "http://localhost:3000/dashboard", mode: Optional[str] = None):
     if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(
             status_code=400,
             detail="Google Client ID and Client Secret are not configured in your backend/.env file."
         )
+    
+    # Determine if this is an admin connecting Google Sheets or a regular user signing in
+    is_sheets_connection = mode == "sheets" or (mode is None and ("/admin" in redirect_url or "/settings" in redirect_url))
+
+    if is_sheets_connection:
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "openid",
+            "email",
+            "profile"
+        ]
+        access_type = "offline"
+        prompt = "consent"
+    else:
+        # Standard user login: only request basic identity scopes (NO spreadsheet access requested)
+        scopes = [
+            "openid",
+            "email",
+            "profile"
+        ]
+        access_type = "online"
+        prompt = "select_account"
     
     flow = Flow.from_client_config(
         client_config={
@@ -50,20 +73,24 @@ def oauth_auth(redirect_url: str = "http://localhost:3001/admin"):
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
         },
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "openid",
-            "email",
-            "profile"
-        ],
+        scopes=scopes,
         redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", f"http://localhost:{os.environ.get('PORT', '8000')}/api/sheets/callback")
     )
     
+    # Preserve mode in state so the callback knows whether to expect spreadsheet scope or user login
+    state_payload = redirect_url
+    if is_sheets_connection and "_mode=sheets" not in redirect_url:
+        sep = "&" if "?" in redirect_url else "?"
+        state_payload = f"{redirect_url}{sep}_mode=sheets"
+    elif not is_sheets_connection and "_mode=login" not in redirect_url:
+        sep = "&" if "?" in redirect_url else "?"
+        state_payload = f"{redirect_url}{sep}_mode=login"
+
     authorization_url, state = flow.authorization_url(
-        access_type="offline",
+        access_type=access_type,
         include_granted_scopes="true",
-        state=redirect_url,
-        prompt="consent"
+        state=state_payload,
+        prompt=prompt
     )
     
     return RedirectResponse(authorization_url)
@@ -76,6 +103,23 @@ def oauth_callback(code: str, state: str):
             detail="Google Client ID and Client Secret are not configured."
         )
 
+    # Determine mode from state
+    is_admin_setup = "_mode=sheets" in (state or "") or "/settings" in (state or "") or "/admin" in (state or "")
+
+    if is_admin_setup:
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "openid",
+            "email",
+            "profile"
+        ]
+    else:
+        scopes = [
+            "openid",
+            "email",
+            "profile"
+        ]
+
     flow = Flow.from_client_config(
         client_config={
             "web": {
@@ -85,12 +129,7 @@ def oauth_callback(code: str, state: str):
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
         },
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "openid",
-            "email",
-            "profile"
-        ],
+        scopes=scopes,
         redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", f"http://localhost:{os.environ.get('PORT', '8000')}/api/sheets/callback")
     )
     
@@ -110,10 +149,8 @@ def oauth_callback(code: str, state: str):
             "id_token": credentials.id_token
         }
 
-        # Check if the state redirect URL is settings or admin (indicating admin sheets setup)
-        is_admin_setup = "/settings" in (state or "") or "/admin" in (state or "")
-
-        if is_admin_setup:
+        # Save spreadsheet credentials only if admin sheets setup
+        if is_admin_setup and credentials.refresh_token:
             with open(_get_token_path(), "w") as f:
                 _json.dump(creds_data, f)
             
@@ -144,7 +181,9 @@ def oauth_callback(code: str, state: str):
         session_json = _json.dumps(session_data)
         session_cookie = base64.b64encode(session_json.encode("utf-8")).decode("utf-8")
 
-        frontend_url = state if state else "http://localhost:3001/admin"
+        # Clean _mode from frontend redirect url
+        frontend_url = state if state else "http://localhost:3000/dashboard"
+        frontend_url = re.sub(r'[?&]_mode=(?:sheets|login)', '', frontend_url)
         separator = "&" if "?" in frontend_url else "?"
         
         response = RedirectResponse(f"{frontend_url}{separator}auth=success")
@@ -158,7 +197,8 @@ def oauth_callback(code: str, state: str):
         )
         return response
     except Exception as e:
-        frontend_url = state if state else "http://localhost:3001/admin"
+        frontend_url = state if state else "http://localhost:3000/dashboard"
+        frontend_url = re.sub(r'[?&]_mode=(?:sheets|login)', '', frontend_url)
         separator = "&" if "?" in frontend_url else "?"
         err_msg = urllib.parse.quote(str(e))
         return RedirectResponse(f"{frontend_url}{separator}auth=failure&error={err_msg}")
