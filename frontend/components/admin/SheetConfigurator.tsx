@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CheckCircle2, XCircle, AlertCircle, Database, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, ShieldCheck, Save, Mail, Trash2, Plus, ClipboardList, Send, Eye, X, Sparkles, Clock, Check, ExternalLink, Users, UserPlus } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Database, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, ShieldCheck, Save, Mail, Trash2, Plus, ClipboardList, Send, Eye, X, Sparkles, Clock, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Config } from "@/lib/types";
@@ -122,14 +122,86 @@ export default function SheetConfigurator() {
     "vaibhav@cogculture.agency",
     "daksh@cogculture.agency"
   ]);
-  const [newProdEmailInput, setNewProdEmailInput] = useState<string>("");
-
   const [bccRecipients, setBccRecipients] = useState<string[]>([
     "apoorv@cogculture.agency",
     "kanishk@cogculture.agency"
   ]);
-  const [newBccEmailInput, setNewBccEmailInput] = useState<string>("");
+  const [newProdRecipientInput, setNewProdRecipientInput] = useState<string>("");
+  const [newBccRecipientInput, setNewBccRecipientInput] = useState<string>("");
 
+  const handleAddProdRecipient = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const email = newProdRecipientInput.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (prodRecipients.includes(email)) {
+      toast.error("This email is already in the recipient list");
+      return;
+    }
+    const updated = [...prodRecipients, email];
+    try {
+      await api.updateConfig({ email_prod_recipients: updated });
+      setProdRecipients(updated);
+      setConfig(prev => ({ ...prev, email_prod_recipients: updated }));
+      setNewProdRecipientInput("");
+      toast.success(`Added ${email} to production recipients`);
+    } catch (err: any) {
+      toast.error("Failed to add recipient");
+    }
+  };
+
+  const handleRemoveProdRecipient = async (email: string) => {
+    const updated = prodRecipients.filter(e => e !== email);
+    if (updated.length === 0) {
+      toast.error("At least one production recipient must remain configured");
+      return;
+    }
+    try {
+      await api.updateConfig({ email_prod_recipients: updated });
+      setProdRecipients(updated);
+      setConfig(prev => ({ ...prev, email_prod_recipients: updated }));
+      toast.success(`Removed ${email}`);
+    } catch (err: any) {
+      toast.error("Failed to remove recipient");
+    }
+  };
+
+  const handleAddBccRecipient = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const email = newBccRecipientInput.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (bccRecipients.includes(email)) {
+      toast.error("This email is already in the BCC list");
+      return;
+    }
+    const updated = [...bccRecipients, email];
+    try {
+      await api.updateConfig({ email_bcc_recipients: updated });
+      setBccRecipients(updated);
+      setConfig(prev => ({ ...prev, email_bcc_recipients: updated }));
+      setNewBccRecipientInput("");
+      toast.success(`Added ${email} to BCC recipients`);
+    } catch (err: any) {
+      toast.error("Failed to add BCC recipient");
+    }
+  };
+
+  const handleRemoveBccRecipient = async (email: string) => {
+    const updated = bccRecipients.filter(e => e !== email);
+    try {
+      await api.updateConfig({ email_bcc_recipients: updated });
+      setBccRecipients(updated);
+      setConfig(prev => ({ ...prev, email_bcc_recipients: updated }));
+      toast.success(`Removed ${email} from BCC`);
+    } catch (err: any) {
+      toast.error("Failed to remove BCC recipient");
+    }
+  };
   const [isSendingLeads, setIsSendingLeads] = useState<boolean>(false);
   const [isSendingProposals, setIsSendingProposals] = useState<boolean>(false);
   const [isSendingBoth, setIsSendingBoth] = useState<boolean>(false);
@@ -147,83 +219,9 @@ export default function SheetConfigurator() {
       await api.updateConfig({ email_test_mode: mode });
       setEmailTestMode(mode);
       setConfig(prev => ({ ...prev, email_test_mode: mode }));
-      toast.success(mode ? "Testing Mode Active (kanishk@cogculture.agency)" : "Production Mode Active (Executive Team)");
+      toast.success(mode ? "Testing Mode Active (Single Test Recipient)" : "Production Mode Active (Team & BCC)");
     } catch (err: any) {
       toast.error("Failed to update test mode");
-    }
-  };
-
-  const handleAddProdRecipient = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const clean = newProdEmailInput.trim().toLowerCase();
-    if (!clean || !clean.includes("@")) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    if (prodRecipients.map(e => e.toLowerCase()).includes(clean)) {
-      toast.error("This email is already in the Primary recipient list");
-      return;
-    }
-    const updated = [...prodRecipients, clean];
-    try {
-      await api.updateConfig({ email_prod_recipients: updated });
-      setProdRecipients(updated);
-      setConfig(prev => ({ ...prev, email_prod_recipients: updated }));
-      setNewProdEmailInput("");
-      toast.success(`Added ${clean} to Primary recipients`);
-    } catch (err: any) {
-      toast.error("Failed to add recipient");
-    }
-  };
-
-  const handleRemoveProdRecipient = async (emailToRemove: string) => {
-    if (prodRecipients.length <= 1) {
-      toast.error("At least one primary recipient is required");
-      return;
-    }
-    const updated = prodRecipients.filter(e => e.toLowerCase() !== emailToRemove.toLowerCase());
-    try {
-      await api.updateConfig({ email_prod_recipients: updated });
-      setProdRecipients(updated);
-      setConfig(prev => ({ ...prev, email_prod_recipients: updated }));
-      toast.success(`Removed ${emailToRemove}`);
-    } catch (err: any) {
-      toast.error("Failed to remove recipient");
-    }
-  };
-
-  const handleAddBccRecipient = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const clean = newBccEmailInput.trim().toLowerCase();
-    if (!clean || !clean.includes("@")) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    if (bccRecipients.map(e => e.toLowerCase()).includes(clean)) {
-      toast.error("This email is already in the BCC recipient list");
-      return;
-    }
-    const updated = [...bccRecipients, clean];
-    try {
-      await api.updateConfig({ email_bcc_recipients: updated });
-      setBccRecipients(updated);
-      setConfig(prev => ({ ...prev, email_bcc_recipients: updated }));
-      setNewBccEmailInput("");
-      toast.success(`Added ${clean} to BCC recipients`);
-    } catch (err: any) {
-      toast.error("Failed to add BCC recipient");
-    }
-  };
-
-  const handleRemoveBccRecipient = async (emailToRemove: string) => {
-    const updated = bccRecipients.filter(e => e.toLowerCase() !== emailToRemove.toLowerCase());
-    try {
-      await api.updateConfig({ email_bcc_recipients: updated });
-      setBccRecipients(updated);
-      setConfig(prev => ({ ...prev, email_bcc_recipients: updated }));
-      toast.success(`Removed ${emailToRemove} from BCC`);
-    } catch (err: any) {
-      toast.error("Failed to remove BCC recipient");
     }
   };
 
@@ -1073,186 +1071,145 @@ export default function SheetConfigurator() {
           </div>
         </div>
 
-        {/* Current Recipient Status Banner */}
-        <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+        {/* Current Recipient Status Banner & Manager */}
+        <div className={`p-5 rounded-xl border flex flex-col gap-4 ${
           emailTestMode 
             ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200" 
             : "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
         }`}>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm">
-                {emailTestMode ? "⚠️ Test Mode Active" : "✅ Production Delivery Active"}
-              </span>
-              <span className="text-xs opacity-80 font-mono">
-                {emailTestMode 
-                  ? `(Target: ${testRecipientInput})` 
-                  : `(Target: ${prodRecipients.length} Primary${bccRecipients.length > 0 ? ` + ${bccRecipients.length} BCC` : ''})`}
-              </span>
-            </div>
-            <p className="text-xs opacity-75 mt-0.5">
-              {emailTestMode
-                ? "Safe testing environment. Production recipients are locked out from automated dispatches until toggled."
-                : `Live automated distribution enabled for ${prodRecipients.join(", ")}${bccRecipients.length > 0 ? ` (BCC: ${bccRecipients.join(", ")})` : ''}.`}
-            </p>
-          </div>
-
-          {emailTestMode && (
-            <div className="flex items-center gap-2">
-              <input
-                type="email"
-                value={testRecipientInput}
-                onChange={(e) => setTestRecipientInput(e.target.value)}
-                placeholder="kanishk@cogculture.agency"
-                className="px-3 py-1.5 text-xs bg-white dark:bg-black/40 border border-amber-500/30 rounded-lg text-gray-900 dark:text-white font-mono outline-none w-56"
-              />
-              <button
-                type="button"
-                onClick={handleSaveTestRecipient}
-                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-lg transition-all cursor-pointer"
-              >
-                Save
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Recipients & Delivery Roster Management Card */}
-        <div className="bg-gray-50/70 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-xl p-5 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-white/5 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20">
-                <Users className="w-4 h-4" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm">
+                  {emailTestMode ? "⚠️ Test Mode Active" : "✅ Production Delivery Active"}
+                </span>
+                <span className="text-xs opacity-80 font-mono">
+                  {emailTestMode 
+                    ? `(Test Target: ${testRecipientInput})` 
+                    : `(${prodRecipients.length} TO · ${bccRecipients.length} BCC)`}
+                </span>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-white">
-                  Email Delivery Roster (10:00 AM IST Automation)
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Add or remove recipients anytime. Changes persist instantly and take effect on the very next dispatch (even at 9:55 AM).
-                </p>
-              </div>
+              <p className="text-xs opacity-75 mt-0.5">
+                {emailTestMode
+                  ? "Safe testing environment. Production recipients and BCCs are locked out until toggled to Production."
+                  : "Emails will be sent to primary recipients with secret BCC delivery to leadership."}
+              </p>
             </div>
-            <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
-              <Check className="w-3.5 h-3.5" /> Instant Live Sync
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Primary TO Recipients */}
-            <div className="space-y-3 p-4 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    Primary Recipients (To:)
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                    {prodRecipients.length}
-                  </span>
-                </div>
-                <span className="text-[10px] text-gray-400">Visible to each other</span>
-              </div>
-
-              {/* List of Primary Emails */}
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {prodRecipients.map((email) => (
-                  <div
-                    key={email}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 text-xs group hover:border-gray-300 dark:hover:border-white/10 transition-all"
-                  >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="font-mono text-gray-800 dark:text-gray-200 truncate">{email}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveProdRecipient(email)}
-                      title="Remove recipient"
-                      className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Add Primary Email Input */}
-              <form onSubmit={handleAddProdRecipient} className="flex gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
+            {emailTestMode && (
+              <div className="flex items-center gap-2">
                 <input
                   type="email"
-                  value={newProdEmailInput}
-                  onChange={(e) => setNewProdEmailInput(e.target.value)}
-                  placeholder="name@cogculture.agency"
-                  className="flex-1 px-3 py-1.5 text-xs bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white font-mono placeholder:text-gray-400 outline-none focus:border-blue-500"
+                  value={testRecipientInput}
+                  onChange={(e) => setTestRecipientInput(e.target.value)}
+                  placeholder="kanishk@cogculture.agency"
+                  className="px-3 py-1.5 text-xs bg-white dark:bg-black/40 border border-amber-500/30 rounded-lg text-gray-900 dark:text-white font-mono outline-none w-56"
                 />
                 <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                  type="button"
+                  onClick={handleSaveTestRecipient}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-lg transition-all cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add To
+                  Save
                 </button>
-              </form>
-            </div>
+              </div>
+            )}
+          </div>
 
-            {/* BCC Blind Copy Recipients */}
-            <div className="space-y-3 p-4 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    Blind Copy (Bcc:)
+          {/* Interactive Recipient Management for Production */}
+          {!emailTestMode && (
+            <div className="pt-3 border-t border-emerald-500/20 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Primary TO Recipients */}
+              <div className="bg-white/60 dark:bg-black/30 p-3.5 rounded-lg border border-emerald-500/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                    Primary Recipients (TO)
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                    {bccRecipients.length}
+                  <span className="text-[10px] font-mono opacity-70">
+                    {prodRecipients.length} configured
                   </span>
                 </div>
-                <span className="text-[10px] text-gray-400">Hidden from Primary To:</span>
+                <div className="flex flex-wrap gap-1.5 mb-2.5 min-h-[32px]">
+                  {prodRecipients.map((email) => (
+                    <span
+                      key={email}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+                    >
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveProdRecipient(email)}
+                        className="hover:text-red-500 transition-colors cursor-pointer text-xs ml-0.5"
+                        title={`Remove ${email}`}
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <form onSubmit={handleAddProdRecipient} className="flex gap-2">
+                  <input
+                    type="email"
+                    value={newProdRecipientInput}
+                    onChange={(e) => setNewProdRecipientInput(e.target.value)}
+                    placeholder="add-email@cogculture.agency"
+                    className="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-black/40 border border-emerald-500/30 rounded-md text-gray-900 dark:text-white font-mono outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-md transition-all cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                </form>
               </div>
 
-              {/* List of BCC Emails */}
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {bccRecipients.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic py-2">No BCC recipients added.</p>
-                ) : (
-                  bccRecipients.map((email) => (
-                    <div
+              {/* Secret BCC Recipients */}
+              <div className="bg-white/60 dark:bg-black/30 p-3.5 rounded-lg border border-emerald-500/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                    Secret Recipients (BCC)
+                  </span>
+                  <span className="text-[10px] font-mono opacity-70">
+                    {bccRecipients.length} configured
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2.5 min-h-[32px]">
+                  {bccRecipients.map((email) => (
+                    <span
                       key={email}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 text-xs group hover:border-gray-300 dark:hover:border-white/10 transition-all"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-mono bg-purple-500/15 border border-purple-500/30 text-purple-900 dark:text-purple-200"
                     >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="font-mono text-gray-800 dark:text-gray-200 truncate">{email}</span>
-                      </div>
+                      {email}
                       <button
                         type="button"
                         onClick={() => handleRemoveBccRecipient(email)}
-                        title="Remove BCC recipient"
-                        className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
+                        className="hover:text-red-500 transition-colors cursor-pointer text-xs ml-0.5"
+                        title={`Remove ${email}`}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        &times;
                       </button>
-                    </div>
-                  ))
-                )}
+                    </span>
+                  ))}
+                </div>
+                <form onSubmit={handleAddBccRecipient} className="flex gap-2">
+                  <input
+                    type="email"
+                    value={newBccRecipientInput}
+                    onChange={(e) => setNewBccRecipientInput(e.target.value)}
+                    placeholder="add-bcc@cogculture.agency"
+                    className="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-black/40 border border-purple-500/30 rounded-md text-gray-900 dark:text-white font-mono outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs rounded-md transition-all cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                </form>
               </div>
-
-              {/* Add BCC Email Input */}
-              <form onSubmit={handleAddBccRecipient} className="flex gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
-                <input
-                  type="email"
-                  value={newBccEmailInput}
-                  onChange={(e) => setNewBccEmailInput(e.target.value)}
-                  placeholder="name@cogculture.agency"
-                  className="flex-1 px-3 py-1.5 text-xs bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white font-mono placeholder:text-gray-400 outline-none focus:border-amber-500"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Bcc
-                </button>
-              </form>
             </div>
-          </div>
+          )}
         </div>
 
         {/* 2 Email Cards Grid */}

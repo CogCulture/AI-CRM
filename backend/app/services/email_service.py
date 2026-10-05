@@ -44,7 +44,7 @@ def send_email(
     html_content: str,
     bcc_emails: Optional[Union[str, List[str]]] = None
 ) -> bool:
-    """Send an HTML email via SMTP to one or multiple recipients with optional BCC recipients."""
+    """Send an HTML email via SMTP to one or multiple recipients, with optional BCC recipients."""
     if not settings.smtp_user or not settings.smtp_password:
         print("SMTP credentials not configured. Skipping dispatch.")
         return False
@@ -60,17 +60,15 @@ def send_email(
         print("No valid recipients. Skipping dispatch.")
         return False
 
-    # Build envelope recipients for SMTP delivery (To + BCC)
-    envelope_recipients = list(recipients)
+    # Process BCC recipients (BCC addresses must NOT be included in visible msg headers)
     bcc_list: List[str] = []
     if bcc_emails:
         if isinstance(bcc_emails, list):
-            bcc_list = [e.strip() for e in bcc_emails if e and e.strip()]
+            bcc_list = [b.strip() for b in bcc_emails if b and b.strip()]
         else:
-            bcc_list = [bcc_emails.strip()] if bcc_emails and bcc_emails.strip() else []
-        for bcc_addr in bcc_list:
-            if bcc_addr not in envelope_recipients:
-                envelope_recipients.append(bcc_addr)
+            bcc_list = [bcc_emails.strip()] if bcc_emails.strip() else []
+
+    all_envelope_recipients = list(set(recipients + bcc_list))
 
     clean_subject = subject.replace("&bull;", "·")
 
@@ -78,14 +76,13 @@ def send_email(
     msg["Subject"] = Header(clean_subject, "utf-8")
     msg["From"] = f"Cog Culture CRM <{settings.smtp_user}>"
     msg["To"] = to_header
-    # NOTE: msg["Bcc"] is intentionally omitted from the MIME headers so BCC recipients remain hidden
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     try:
         server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         server.starttls()
         server.login(settings.smtp_user, settings.smtp_password)
-        server.sendmail(settings.smtp_user, envelope_recipients, msg.as_string())
+        server.sendmail(settings.smtp_user, all_envelope_recipients, msg.as_string())
         server.quit()
         safe_sub = clean_subject.encode("ascii", "replace").decode("ascii")
         bcc_info = f" (BCC: {', '.join(bcc_list)})" if bcc_list else ""
@@ -97,35 +94,31 @@ def send_email(
         return False
 
 
-def get_email_recipients(override_recipient: Optional[str] = None) -> Tuple[List[str], bool]:
-    """Returns (recipients_list, is_test_mode)."""
+def get_email_recipients(override_recipient: Optional[str] = None) -> Tuple[List[str], List[str], bool]:
+    """Returns (recipients_list, bcc_list, is_test_mode)."""
     if override_recipient and override_recipient.strip():
-        return [override_recipient.strip()], True
+        return [override_recipient.strip()], [], True
 
     cfg = config_service.load_config()
-    test_mode = cfg.get("email_test_mode", True)
+    test_mode = cfg.get("email_test_mode", False)
     test_recipient = cfg.get("email_test_recipient", "kanishk@cogculture.agency").strip()
     prod_recipients = cfg.get("email_prod_recipients", [
         "kanika@cogculture.agency",
         "vaibhav@cogculture.agency",
         "daksh@cogculture.agency",
     ])
-
-    if test_mode:
-        return [test_recipient or "kanishk@cogculture.agency"], True
-    else:
-        valid_prod = [r.strip() for r in prod_recipients if r and r.strip()]
-        return valid_prod or ["kanishk@cogculture.agency"], False
-
-
-def get_bcc_recipients() -> List[str]:
-    """Returns the list of BCC email recipients for production digests."""
-    cfg = config_service.load_config()
-    bcc = cfg.get("email_bcc_recipients", [
+    bcc_recipients = cfg.get("email_bcc_recipients", [
         "apoorv@cogculture.agency",
         "kanishk@cogculture.agency",
     ])
-    return [e.strip() for e in bcc if e and e.strip()]
+
+    valid_bcc = [b.strip() for b in bcc_recipients if b and b.strip()]
+
+    if test_mode:
+        return [test_recipient or "kanishk@cogculture.agency"], [], True
+    else:
+        valid_prod = [r.strip() for r in prod_recipients if r and r.strip()]
+        return valid_prod or ["kanishk@cogculture.agency"], valid_bcc, False
 
 
 # ---------------------------------------------------------------------------
@@ -764,8 +757,7 @@ def build_proposals_followup_alert_html(
 # ---------------------------------------------------------------------------
 
 def dispatch_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict[str, Any]:
-    recipients, is_test_mode = get_email_recipients(override_recipient)
-    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
+    recipients, bcc_recipients, is_test_mode = get_email_recipients(override_recipient)
     data = fetch_pipeline_digest_data()
     subject, html_content = build_daily_leads_digest_html(data, recipients, is_test_mode)
     success = send_email(recipients, subject, html_content, bcc_emails=bcc_recipients)
@@ -782,8 +774,7 @@ def dispatch_daily_leads_digest(override_recipient: Optional[str] = None) -> Dic
 
 
 def dispatch_proposals_followup_alert(override_recipient: Optional[str] = None) -> Dict[str, Any]:
-    recipients, is_test_mode = get_email_recipients(override_recipient)
-    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
+    recipients, bcc_recipients, is_test_mode = get_email_recipients(override_recipient)
     data = fetch_pipeline_digest_data()
     subject, html_content = build_proposals_followup_alert_html(data, recipients, is_test_mode)
     success = send_email(recipients, subject, html_content, bcc_emails=bcc_recipients)
@@ -802,8 +793,7 @@ def dispatch_proposals_followup_alert(override_recipient: Optional[str] = None) 
 
 
 def preview_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict[str, Any]:
-    recipients, is_test_mode = get_email_recipients(override_recipient)
-    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
+    recipients, bcc_recipients, is_test_mode = get_email_recipients(override_recipient)
     data = fetch_pipeline_digest_data()
     subject, html_content = build_daily_leads_digest_html(data, recipients, is_test_mode)
     return {
@@ -819,8 +809,7 @@ def preview_daily_leads_digest(override_recipient: Optional[str] = None) -> Dict
 
 
 def preview_proposals_followup_alert(override_recipient: Optional[str] = None) -> Dict[str, Any]:
-    recipients, is_test_mode = get_email_recipients(override_recipient)
-    bcc_recipients = get_bcc_recipients() if not is_test_mode else []
+    recipients, bcc_recipients, is_test_mode = get_email_recipients(override_recipient)
     data = fetch_pipeline_digest_data()
     subject, html_content = build_proposals_followup_alert_html(data, recipients, is_test_mode)
     return {
